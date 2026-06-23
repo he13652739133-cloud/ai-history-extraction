@@ -1,0 +1,904 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI 提取史料｜经验分享</title>
+  <style>
+    :root{
+      --bg:#07101b;
+      --bg2:#101a2a;
+      --text:#f7fbff;
+      --muted:rgba(247,251,255,.72);
+      --dim:rgba(247,251,255,.54);
+      --line:rgba(255,255,255,.16);
+      --glass:rgba(255,255,255,.095);
+      --glass2:rgba(255,255,255,.055);
+      --gold:#ffd27a;
+      --blue:#7ab7ff;
+      --red:#ff6868;
+      --green:#9be2b0;
+      --purple:#cab2ff;
+      --shadow:0 28px 90px rgba(0,0,0,.42);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;overflow:hidden;background:#05080e;color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans SC","Microsoft YaHei",Arial,sans-serif}
+    button,a{font:inherit;color:inherit}
+    body:before{content:"";position:fixed;inset:0;background:radial-gradient(circle at 10% 10%,rgba(122,183,255,.18),transparent 32%),radial-gradient(circle at 90% 70%,rgba(255,210,122,.11),transparent 34%),linear-gradient(135deg,#05080f,#121b2a 58%,#06080d);pointer-events:none}
+
+    .deck{width:100vw;height:100vh;position:relative;overflow:hidden}
+    .topbar{position:fixed;z-index:80;left:0;right:0;top:0;height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 5.5vw;background:linear-gradient(to bottom,rgba(2,5,10,.82),rgba(2,5,10,.22));backdrop-filter:blur(16px);border-bottom:1px solid rgba(255,255,255,.06)}
+    .brand{display:flex;align-items:center;gap:10px;font-weight:900;letter-spacing:.02em}.brandMark{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;background:linear-gradient(135deg,rgba(122,183,255,.26),rgba(255,255,255,.07));border:1px solid var(--line)}
+    .nav{display:flex;gap:26px;font-size:14px;color:rgba(255,255,255,.72)}.nav span{cursor:pointer}.nav span:hover{color:#fff}.tools{display:flex;gap:8px;align-items:center}.pill{border:1px solid var(--line);background:rgba(255,255,255,.08);border-radius:999px;padding:7px 11px;font-size:12px;cursor:pointer;text-decoration:none;white-space:nowrap}.pill:hover{background:rgba(255,255,255,.16)}.pill.on{background:rgba(255,210,122,.92);color:#111;border-color:rgba(255,210,122,.95);font-weight:900}.editorDock{position:fixed;z-index:100000;right:18px;top:66px;display:none;gap:8px;align-items:center;flex-wrap:wrap;max-width:min(760px,calc(100vw - 36px));padding:10px 12px;border:1px solid rgba(255,255,255,.18);border-radius:18px;background:rgba(5,8,14,.86);backdrop-filter:blur(18px);box-shadow:0 18px 60px rgba(0,0,0,.42)}body.editing .editorDock{display:flex}.editorDock .sep{width:1px;height:24px;background:rgba(255,255,255,.18);margin:0 2px}.dockTip{font-size:12px;color:rgba(255,255,255,.62);padding:0 4px}.dockHandle{display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border-radius:999px;background:rgba(122,183,255,.18);border:1px solid rgba(122,183,255,.35);font-size:12px;font-weight:900;color:#eaf5ff;cursor:grab;user-select:none}.dockHandle:active{cursor:grabbing}.uiHidden .topbar,.uiHidden .editorDock,.uiHidden .editHint,.uiHidden .arrowBtn,.uiHidden .dots,.uiHidden .pageNo,.uiHidden .progress{opacity:0!important;pointer-events:none!important}.uiHidden .source{display:none!important}
+
+    .slide{position:absolute;inset:0;opacity:0;transform:translateX(4%);transition:opacity .28s ease,transform .42s cubic-bezier(.2,.8,.2,1);pointer-events:none;background:#07101b;overflow:hidden}
+    .slide.active{opacity:1;transform:translateX(0);pointer-events:auto}.slide.prev{transform:translateX(-4%)}
+    .slideBg{position:absolute;inset:0}.slideBg img{width:100%;height:100%;object-fit:cover;opacity:.52;filter:saturate(1.04) contrast(1.04)}.shade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(4,7,12,.92),rgba(4,7,12,.64) 55%,rgba(4,7,12,.28)),linear-gradient(180deg,rgba(4,7,12,.50),transparent 40%,rgba(4,7,12,.82))}
+    .softBg{position:absolute;inset:0;background:radial-gradient(circle at 76% 20%,rgba(122,183,255,.17),transparent 30%),radial-gradient(circle at 18% 80%,rgba(255,210,122,.12),transparent 32%),linear-gradient(135deg,#07101b,#141f31 58%,#06090f)}
+
+    .content{position:relative;z-index:2;height:100%;display:grid;place-items:center;padding:62px 2.4vw 34px}.frame{position:relative;width:min(1450px,100%);height:min(805px,calc(100vh - 104px));display:grid;grid-template-rows:auto 1fr;gap:14px}
+    .head{display:grid;gap:8px}.head.center{text-align:center;justify-items:center}.head.row{grid-template-columns:1fr auto;align-items:end}.kicker{display:inline-flex;align-items:center;gap:10px;color:var(--gold);font-size:12px;font-weight:950;letter-spacing:.16em;text-transform:uppercase}.kicker:before{content:"";width:34px;height:2px;background:var(--gold)}
+    h1{font-size:clamp(46px,6vw,88px);line-height:1.03;margin:0;letter-spacing:-.06em;text-wrap:balance}h2{font-size:clamp(34px,4.4vw,62px);line-height:1.08;margin:0;letter-spacing:-.045em;text-wrap:balance}h3{font-size:22px;margin:0 0 10px}.lead{font-size:clamp(18px,2vw,27px);line-height:1.5;color:rgba(255,255,255,.87);margin:0}.sub{font-size:15px;line-height:1.65;color:var(--muted);margin:0}.tiny{font-size:12px;line-height:1.55;color:var(--dim)}
+
+    .glass{background:linear-gradient(135deg,rgba(255,255,255,.13),rgba(255,255,255,.055));border:1px solid var(--line);border-radius:24px;box-shadow:var(--shadow);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px)}.pad{padding:22px}.padLg{padding:28px}
+    .mainGrid{display:grid;gap:18px;min-height:0}.two{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.leftBig{grid-template-columns:minmax(0,1.18fr) minmax(0,.82fr)}.rightBig{grid-template-columns:minmax(0,.86fr) minmax(0,1.14fr)}.three{grid-template-columns:repeat(3,minmax(0,1fr))}.fit{height:100%;min-height:0}.centered{display:grid;place-items:center}.stack{display:grid;gap:14px;align-content:start}
+
+    .heroFrame{height:100%;display:grid;grid-template-rows:1fr auto;gap:18px;align-items:end}.heroText{max-width:850px}.chips{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.chip{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border-radius:18px;background:rgba(255,255,255,.085);border:1px solid rgba(255,255,255,.14);backdrop-filter:blur(18px)}.chip b{display:block;margin-bottom:4px}.chip span{color:var(--muted);font-size:14px;line-height:1.45}.ico{flex:0 0 auto;width:32px;height:32px;border-radius:10px;display:grid;place-items:center;background:rgba(122,183,255,.18);color:#e7f2ff;font-weight:950}
+
+    .infoGraphic{height:100%;display:grid;grid-template-columns:1.05fr .95fr;gap:18px}.bigFlow{display:grid;gap:12px}.flowRow{display:grid;grid-template-columns:84px 1fr 130px;gap:12px;align-items:center;padding:16px 18px;border-radius:20px;background:rgba(255,255,255,.075);border:1px solid rgba(255,255,255,.12)}.flowRow .term{font-size:30px;font-weight:950;letter-spacing:-.04em}.flowRow .desc b{display:block;font-size:18px;margin-bottom:4px}.flowRow .desc span{color:var(--muted);font-size:14px;line-height:1.45}.flowRow .use{font-size:13px;color:#fff;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:8px 10px;text-align:center}.quoteBox{display:grid;align-content:center;gap:18px}.quote{font-size:28px;line-height:1.35;font-weight:900;letter-spacing:-.03em}.quote mark{background:rgba(255,210,122,.18);color:#fff;border:1px solid rgba(255,210,122,.28);padding:0 .18em;border-radius:8px}.routeTable{display:grid;gap:8px}.route{display:grid;grid-template-columns:112px 1fr;gap:14px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.10)}.route:last-child{border-bottom:0}.route b{font-size:16px}.route span{font-size:14px;color:var(--muted);line-height:1.5}
+
+    .matrix{height:100%;display:grid;grid-template-columns:.94fr 1.06fr;gap:18px}.decision{height:100%;display:grid;grid-template-rows:repeat(6,minmax(0,1fr));gap:9px}.decision .row{display:grid;grid-template-columns:118px 1fr 130px;gap:12px;align-items:center;padding:10px 14px;border-radius:16px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.11)}.decision b{color:#fff}.decision span{font-size:14px;color:var(--muted)}.decision em{font-style:normal;font-size:12px;color:#111;background:var(--gold);border-radius:999px;padding:5px 8px;text-align:center;font-weight:900}.workflow{height:100%;display:grid;grid-template-rows:repeat(auto-fit,minmax(64px,1fr));align-content:stretch;gap:10px}.stepLine{display:grid;grid-template-columns:54px 1fr;gap:14px;align-items:center;padding:10px 15px;border-radius:18px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.11)}.stepNo{width:46px;height:46px;border-radius:15px;background:linear-gradient(135deg,rgba(122,183,255,.35),rgba(255,255,255,.10));display:grid;place-items:center;font-size:22px;font-weight:950}.stepLine b{display:block;font-size:18px}.stepLine span{font-size:14px;color:var(--muted);line-height:1.4}
+
+    .thumbGrid{height:100%;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(2,1fr);gap:14px}.thumbCard{position:relative;overflow:hidden;border-radius:22px;border:1px solid var(--line);background:#111b2b;box-shadow:var(--shadow);min-height:0}.thumbCard img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.55;filter:saturate(1.03) contrast(1.05)}.thumbCard:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.1),rgba(0,0,0,.72))}.thumbText{position:absolute;z-index:2;left:18px;right:18px;bottom:16px}.thumbText b{display:block;font-size:22px;margin-bottom:6px}.thumbText span{font-size:14px;color:rgba(255,255,255,.75);line-height:1.45}.badge{position:absolute;z-index:2;left:16px;top:14px;padding:5px 9px;border-radius:999px;background:rgba(255,210,122,.9);color:#111;font-size:12px;font-weight:950}
+
+    .caseGrid{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(380px,.92fr);gap:18px;height:100%;min-height:0}.imagePanel{position:relative;display:grid;place-items:center;overflow:hidden;border-radius:24px;background:rgba(0,0,0,.26);border:1px solid var(--line);box-shadow:var(--shadow);padding:12px}.imagePanel img{max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;border-radius:15px}.sidePanel{display:grid;grid-template-rows:auto 1fr;gap:12px;min-height:0}.sideIntro{padding:18px 18px 15px}.sideIntro h3{font-size:24px}.fieldList{display:grid;gap:9px;overflow:auto;padding-right:2px}.field{display:grid;grid-template-columns:44px 1fr;gap:12px;padding:12px;border-radius:17px;background:rgba(255,255,255,.075);border:1px solid rgba(255,255,255,.11);cursor:pointer}.field:hover,.field.active{background:rgba(122,183,255,.13);border-color:rgba(122,183,255,.55)}.mark{width:34px;height:34px;border-radius:999px;display:grid;place-items:center;font-weight:950;background:var(--blue);color:#07101b}.field b{display:block;font-size:16px;margin-bottom:3px}.field span{font-size:13px;color:var(--muted);line-height:1.43}.pin{position:absolute;transform:translate(-50%,-50%);width:36px;height:36px;border-radius:999px;border:3px solid #fff;background:var(--red);display:grid;place-items:center;font-weight:950;color:#fff;box-shadow:0 0 0 7px rgba(255,104,104,.18),0 12px 30px rgba(0,0,0,.46);cursor:pointer}.pin.blue{background:var(--blue);color:#07101b;box-shadow:0 0 0 7px rgba(122,183,255,.18),0 12px 30px rgba(0,0,0,.46)}.pin.gold{background:var(--gold);color:#111;box-shadow:0 0 0 7px rgba(255,210,122,.18),0 12px 30px rgba(0,0,0,.46)}.pin.green{background:var(--green);color:#102015;box-shadow:0 0 0 7px rgba(155,226,176,.18),0 12px 30px rgba(0,0,0,.46)}.pin.active{transform:translate(-50%,-50%) scale(1.12)}
+
+    .tableWrap{border-radius:24px;border:1px solid var(--line);background:linear-gradient(135deg,rgba(255,255,255,.14),rgba(255,255,255,.060));box-shadow:var(--shadow);backdrop-filter:blur(22px);overflow:hidden;min-height:0;display:grid}.tableWrap.scroll{overflow:auto}table{width:100%;height:100%;border-collapse:collapse;font-size:14px;table-layout:fixed}th,td{padding:12px 14px;text-align:left;vertical-align:middle;border-bottom:1px solid rgba(255,255,255,.10)}th{background:rgba(255,255,255,.16);color:#fff;font-weight:900;white-space:nowrap}td{color:rgba(255,255,255,.80)}tr:last-child td{border-bottom:none}tbody tr:hover td{background:rgba(255,255,255,.045)}.tag{display:inline-block;padding:3px 7px;border-radius:999px;background:rgba(122,183,255,.15);border:1px solid rgba(122,183,255,.34);font-size:12px;color:#e7f2ff;white-space:nowrap}.tag.warn{background:rgba(255,104,104,.13);border-color:rgba(255,104,104,.36);color:#ffdede}.tag.ok{background:rgba(155,226,176,.13);border-color:rgba(155,226,176,.34);color:#e8ffef}.tag.gold{background:rgba(255,210,122,.13);border-color:rgba(255,210,122,.36);color:#fff0cf}
+
+    .tableSlide{height:100%;display:grid;grid-template-rows:165px 1fr;gap:16px}.strip{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;min-height:0}.strip figure{margin:0;position:relative;overflow:hidden;border-radius:18px;border:1px solid var(--line);background:rgba(255,255,255,.06)}.strip img{width:100%;height:100%;object-fit:cover;opacity:.74}.strip figcaption{position:absolute;left:10px;bottom:8px;background:rgba(0,0,0,.48);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:5px 9px;font-size:12px}
+
+    .diagramGrid{height:100%;display:grid;grid-template-columns:.92fr 1.08fr;gap:18px}.diagram{height:100%;min-height:0;border-radius:24px;border:1px solid var(--line);background:radial-gradient(circle at 50% 43%,rgba(122,183,255,.20),transparent 58%),linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.05));box-shadow:var(--shadow);padding:14px}.diagram svg{width:100%;height:100%;display:block}.edge{stroke:rgba(255,255,255,.42);stroke-width:3;stroke-linecap:round}.node{fill:rgba(255,255,255,.14);stroke:rgba(255,255,255,.38);stroke-width:2}.node.main{fill:rgba(122,183,255,.33);stroke:rgba(176,215,255,.75)}.node.gold{fill:rgba(255,210,122,.22);stroke:rgba(255,210,122,.62)}.svgText{fill:#fff;font-weight:900;font-size:18px;text-anchor:middle;dominant-baseline:middle}.svgSmall{fill:rgba(255,255,255,.72);font-size:12px;text-anchor:middle;dominant-baseline:middle}.svgLabel{fill:rgba(255,255,255,.75);font-size:13px;text-anchor:middle;dominant-baseline:middle}
+
+    .promptGrid{height:100%;display:grid;grid-template-columns:.86fr 1.14fr;gap:18px}.promptBox{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;line-height:1.55;white-space:pre-wrap;background:rgba(0,0,0,.34);border:1px solid rgba(255,255,255,.13);border-radius:22px;padding:20px;color:rgba(255,255,255,.84);overflow:auto}.compactCards{height:100%;display:grid;grid-template-rows:repeat(auto-fit,minmax(70px,1fr));gap:10px}.compactCard{display:grid;grid-template-columns:34px 1fr;gap:10px;align-items:center;padding:12px 14px;border-radius:16px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.10)}.compactCard b{display:block}.compactCard span{font-size:13px;color:var(--muted);line-height:1.4}
+
+    .arrowBtn{position:fixed;z-index:90;top:50%;transform:translateY(-50%);width:48px;height:82px;border:1px solid rgba(255,255,255,.12);background:rgba(0,0,0,.36);backdrop-filter:blur(10px);font-size:34px;display:grid;place-items:center;cursor:pointer}.arrowBtn.left{left:0;border-radius:0 18px 18px 0}.arrowBtn.right{right:0;border-radius:18px 0 0 18px}.arrowBtn:hover{background:rgba(122,183,255,.25)}.dots{position:fixed;z-index:90;left:50%;bottom:18px;transform:translateX(-50%);display:flex;gap:7px;padding:7px 11px;border:1px solid var(--line);background:rgba(0,0,0,.32);border-radius:999px;backdrop-filter:blur(14px)}.dot{width:8px;height:8px;border-radius:999px;background:rgba(255,255,255,.33);cursor:pointer;border:0}.dot.active{width:26px;background:#fff}.progress{position:fixed;z-index:95;left:0;bottom:0;height:4px;background:linear-gradient(90deg,var(--blue),var(--gold));width:0;transition:width .30s ease}.pageNo{position:fixed;z-index:90;right:22px;bottom:20px;color:rgba(255,255,255,.58);font-size:12px}.source{display:none}.editOnly{display:none}.editHint{display:none;position:fixed;z-index:120;left:50%;top:64px;transform:translateX(-50%);padding:8px 14px;border-radius:999px;background:rgba(255,210,122,.92);color:#111;font-size:13px;font-weight:900;box-shadow:0 10px 28px rgba(0,0,0,.28)}body.editing .editOnly,body.editing .editHint{display:inline-flex}body.editing [contenteditable="true"]{outline:2px dashed rgba(255,210,122,.72);outline-offset:4px;border-radius:6px;cursor:text}body.editing .slide{user-select:text}body.editing .pin,body.editing .dot{pointer-events:none;opacity:.45}body.layouting [contenteditable="true"]{outline:0;cursor:move}body.layouting .slide{user-select:none}body.layouting .dot{pointer-events:none;opacity:.28}body.layouting .pin{pointer-events:auto;opacity:1}body.layouting .chip,body.layouting .glass,body.layouting .flowRow,body.layouting .imagePanel,body.layouting .tableWrap,body.layouting .thumbCard,body.layouting .diagram,body.layouting .promptBox,body.layouting .compactCard,body.layouting .miniRule,body.layouting .stepLine,body.layouting .field,body.layouting .strip figure,body.layouting .heroText,body.layouting .head,body.layouting .pin{cursor:move}body.layouting .movableSelected{outline:2px solid rgba(255,210,122,.95)!important;outline-offset:5px;box-shadow:0 0 0 9999px rgba(0,0,0,.03),0 20px 70px rgba(0,0,0,.45)!important}.resizeHandle{position:absolute;right:-10px;bottom:-10px;width:18px;height:18px;border-radius:6px;background:var(--gold);border:2px solid rgba(0,0,0,.55);box-shadow:0 8px 20px rgba(0,0,0,.35);cursor:nwse-resize;z-index:9999}body.layouting .editHint{background:rgba(122,183,255,.94);color:#07101b}.fillPanel{height:100%;display:grid;grid-template-rows:auto 1fr;gap:18px}.miniRules{height:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:1fr;gap:12px}.miniRule{display:grid;align-content:center;gap:6px;padding:16px;border-radius:18px;background:rgba(255,255,255,.075);border:1px solid rgba(255,255,255,.11)}.miniRule b{font-size:18px}.miniRule span{font-size:13px;line-height:1.45;color:var(--muted)}.bottomBand{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.bottomBand div{padding:13px 15px;border-radius:16px;background:rgba(255,255,255,.075);border:1px solid rgba(255,255,255,.11)}.bottomBand b{display:block;margin-bottom:4px}.bottomBand span{font-size:13px;color:var(--muted);line-height:1.4}
+    .pptObject{position:relative}.pptObject>.moveHandle{display:none;position:absolute;left:-12px;top:-12px;width:24px;height:24px;border-radius:8px;background:rgba(255,210,122,.96);border:2px solid rgba(0,0,0,.46);box-shadow:0 8px 20px rgba(0,0,0,.35);z-index:10000;cursor:grab}.pptObject>.moveHandle:before{content:"✥";display:grid;place-items:center;width:100%;height:100%;font-size:13px;color:#111;font-weight:950}.pptObject>.moveHandle:active{cursor:grabbing}body.layouting .pptObject:hover,body.layouting .pptObject.movableSelected{outline:2px solid rgba(255,210,122,.82)!important;outline-offset:5px}body.layouting .pptObject:hover>.moveHandle,body.layouting .pptObject.movableSelected>.moveHandle{display:block}body.layouting [contenteditable="true"]{cursor:text!important;outline:2px dashed rgba(255,210,122,.48);outline-offset:4px}body.layouting .chip,body.layouting .glass,body.layouting .flowRow,body.layouting .imagePanel,body.layouting .tableWrap,body.layouting .thumbCard,body.layouting .diagram,body.layouting .promptBox,body.layouting .compactCard,body.layouting .miniRule,body.layouting .stepLine,body.layouting .field,body.layouting .strip figure,body.layouting .heroText,body.layouting .head,body.layouting .pin{cursor:default!important}.resizeHandle{display:none}body.layouting .movableSelected>.resizeHandle{display:block}.pptGroup{position:absolute;border:1px dashed rgba(255,210,122,.45);border-radius:18px;min-width:80px;min-height:50px}.pptGroup>.pptObject{position:absolute!important}.pptGroup.movableSelected{background:rgba(255,210,122,.035)}.pptPlaceholder{visibility:hidden!important;pointer-events:none!important;min-width:1px;min-height:1px}.copyFlash{animation:copyPulse .55s ease}@keyframes copyPulse{0%{box-shadow:0 0 0 0 rgba(255,210,122,.65)}100%{box-shadow:0 0 0 18px rgba(255,210,122,0)}}.guideLine{position:fixed;z-index:10001;background:rgba(122,183,255,.9);pointer-events:none}.guideLine.v{width:1px;height:100vh;top:0}.guideLine.h{height:1px;width:100vw;left:0}
+    @media(max-width:1000px){.topbar{padding:0 18px}.nav{display:none}.content{padding:70px 20px 60px}.frame{height:calc(100vh - 130px)}.two,.leftBig,.rightBig,.three,.infoGraphic,.matrix,.caseGrid,.diagramGrid,.promptGrid{grid-template-columns:1fr}.chips,.strip{grid-template-columns:1fr}.thumbGrid{grid-template-columns:1fr;grid-template-rows:repeat(6,170px);overflow:auto}.tableSlide{grid-template-rows:1fr 1.2fr}.source{display:none}.arrowBtn{width:42px;height:70px}.frame{overflow:auto}.caseGrid{height:auto}.imagePanel{min-height:300px}.slide{overflow:auto}}
+  </style>
+</head>
+<body class="">
+<div class="deck">
+  <header class="topbar">
+    <div class="brand"><span class="brandMark">AI</span><span>AI 提取史料｜经验分享</span></div>
+    <nav class="nav">
+      <span onclick="go(0)">开场</span><span onclick="go(1)">概念</span><span onclick="go(2)">判型</span><span onclick="go(4)">素材</span><span onclick="go(5)">侨批</span><span onclick="go(7)">族谱</span><span onclick="go(9)">报纸</span><span onclick="go(10)">墓碑</span><span onclick="go(15)">总结</span>
+    </nav>
+    <div class="tools"><button class="pill on" onclick="toggleEdit()" id="editBtn">退出编辑</button><button class="pill" onclick="toggleFull()">全屏</button><span class="pill">← → 翻页</span></div>
+  </header>
+  
+
+  <section class="slide active" data-source="">
+    <div class="slideBg"><img src="assets/img_001.jpg" alt="墓碑背景"><div class="shade"></div></div>
+    <div class="content"><div class="frame">
+      <div></div>
+      <div class="heroFrame">
+        <div class="heroText">
+          
+          <h1 class="pptObject" data-floating="1" style="position: absolute; left: -4px; top: 216.828px; width: 870px; height: 190.875px; margin: 0px; z-index: 60; line-height: 1.35;">AI 提取史料：<div>从原始材料结构化数据</div></h1>
+          <p class="lead pptObject" data-floating="1" style="position: absolute; left: -4px; top: 491.703px; width: 871px; height: 81px; margin: 0px; z-index: 60;">AI 不太能代替人来解释史料、写结论，但可以先帮我们把材料认知清楚、提取字段、量化为结构化的数据</p>
+        </div>
+        <div class="pptPlaceholder" data-for="ppt-tzybxe5z8a" style="width: 1396.59px; height: 80.2969px; grid-area: auto; flex: 0 0 1396.59px;"></div><div class="pptPlaceholder" data-for="ppt-r8f7nvw37mq" style="width: 1396.59px; height: 80.2969px; grid-area: auto; flex: 0 0 1396.59px;"></div><div class="chips pptObject" data-floating="1" style="position: absolute; left: -1px; top: 621.703px; width: 1396.59px; height: 80.2969px; margin: 0px; z-index: 60;" data-placeholder="ppt-r8f7nvw37mq"><div class="chip"><span class="ico">1</span><div><b>看清楚</b><span>把图片、扫描件、录音转成可处理的信息。</span></div></div><div class="chip"><span class="ico">2</span><div><b>提字段</b><span>提取人名、时间、地点、金额、关系、事件。</span></div></div><div class="chip"><span class="ico">3</span><div><b>可复核</b><span>每条结果都能回到原图、原文或时间戳。</span></div></div></div>
+      </div>
+    </div></div>
+  </section>
+
+  <section class="slide" data-source="基础概念：OCR、VLM、LLM、结构化">
+    <div class="softBg"></div>
+    <div class="content"><div class="frame">
+      <div class="head center"><div class="pptPlaceholder" data-for="ppt-0kwq9p54n649" style="width: 323.141px; height: 66.9531px; grid-area: auto; flex: 0 0 323.141px;"></div><h2 class="pptObject" data-placeholder="ppt-0kwq9p54n649" data-floating="1" style="position: absolute; left: 537.719px; top: -7px; width: 323.141px; height: 66.9531px; margin: 0px; z-index: 60;">几种 AI 能力</h2></div>
+      <div class="infoGraphic">
+        <div class="bigFlow">
+          <div class="flowRow pptObject"><div class="term pptObject">OCR</div><div class="desc"><b>提取文字信息</b><span>适合扫描 PDF、旧报纸、清晰印刷体，把图片里的字转成可检索文本。</span></div><div class="use pptObject">文字识别</div></div>
+          <div class="flowRow pptObject"><div class="term pptObject">VLM</div><div class="desc"><b>提取图像信息</b><span>适合碑刻、手写、复杂版面，判断文字区域、版面结构和图像内容。</span></div><div class="use pptObject">图像理解</div></div>
+          <div class="flowRow pptObject"><div class="term pptObject">LLM</div><div class="desc"><b>结构化整理</b><span>把识别出的文本继续拆成人名、地名、金额、关系、事件等字段。</span></div><div class="use pptObject">字段抽取</div></div>
+          <div class="flowRow pptObject"><div class="term pptObject">复核</div><div class="desc"><b>形成可检查的数据</b><span>每个字段保留证据来源，标出确定项、不确定项和人工复核项。</span></div><div class="use pptObject">人工定稿</div></div>
+        </div>
+        <div class="quoteBox glass padLg pptObject">
+          
+          <div class="routeTable">
+            <div class="pptPlaceholder" data-for="ppt-g2ho74alvps" style="width: 596.828px; height: 49px; grid-area: auto; flex: 0 0 596.828px;"></div><div class="route pptObject" data-placeholder="ppt-g2ho74alvps" data-floating="1" style="position: absolute; left: 1221.75px; top: 406.656px; width: 596.828px; height: 49px; margin: 0px; z-index: 60;"><b>少量材料</b><span>直接上传图片或 PDF，边识别边修正。</span></div>
+            <div class="pptPlaceholder" data-for="ppt-q4vckpcqbl" style="width: 596.828px; height: 49px; grid-area: auto; flex: 0 0 596.828px;"></div><div class="route pptObject" data-placeholder="ppt-q4vckpcqbl" data-floating="1" style="position: absolute; left: 1221.75px; top: 463.656px; width: 596.828px; height: 49px; margin: 0px; z-index: 60;"><b>几十页材料</b><span>先拆页，再批量识别，最后统一抽字段。</span></div>
+            <div class="pptPlaceholder" data-for="ppt-zl6z778agmd" style="width: 596.828px; height: 48px; grid-area: auto; flex: 0 0 596.828px;"></div><div class="route pptObject" data-placeholder="ppt-zl6z778agmd" data-floating="1" style="position: absolute; left: 1221.75px; top: 520.656px; width: 596.828px; height: 48px; margin: 0px; z-index: 60;"><b>整本书/大库</b><span>先切块编号，再输出 JSON 或结构化表，建立检索和关系。</span></div>
+          </div>
+        </div>
+      </div>
+    <div class="quote pptObject" data-floating="1" style="position: absolute; left: 801.75px; top: 157.266px; width: 617.828px; height: 114.391px; margin: 0px; z-index: 80; line-height: 1.75;">基本流程：<br><mark>先识别，再提取，再结构化，最后由研究者复核</mark></div><div class="quote pptObject" data-floating="1" style="position: absolute; left: 801.75px; top: 335.266px; width: 415.828px; height: 50px; margin: 0px; z-index: 80; line-height: 1.75;">不同史料处理的方式也不一样：<br></div><div class="route pptObject" data-floating="1" style="position: absolute; left: 810.75px; top: 440.656px; width: 596.828px; height: 49px; margin: 0px; z-index: 80;"><b>少量材料</b><span>直接上传图片或 PDF，边识别边修正。</span></div><div class="route pptObject" data-floating="1" style="position: absolute; left: 810.75px; top: 548.656px; width: 596.828px; height: 49px; margin: 0px; z-index: 80;"><b>几十页材料</b><span>先拆页，再批量识别，最后统一抽字段。</span></div><div class="route pptObject" data-floating="1" style="position: absolute; left: 810.75px; top: 677.656px; width: 596.828px; height: 48px; margin: 0px; z-index: 80;"><b>整本书/大库</b><span>先切块编号，再输出 JSON 或结构化表，建立检索和关系。</span></div></div></div>
+  </section>
+
+  <section class="slide" data-source="基础概念：材料判型先于工具选择">
+    <div class="softBg"></div>
+    <div class="content"><div class="frame">
+      <div class="head row"><div><div class="pptPlaceholder" data-for="ppt-y91sh2xh4di" style="width: 987.344px; height: 66.9531px; grid-area: auto; flex: 0 0 987.344px;"></div><h2 class="pptObject" data-placeholder="ppt-y91sh2xh4di" data-floating="1" style="position: absolute; left: 29px; top: -1px; width: 987.344px; height: 66.9531px; margin: 0px; z-index: 60;">先判断材料，再决定处理方式</h2></div><p class="sub pptObject" style="max-width:410px">同样是史料，PDF、照片、碑刻、录音的处理方式完全不同。</p></div>
+      <div class="matrix">
+        <div class="glass padLg fillPanel pptObject">
+          <div>
+            <h2 style="font-size:50px" class="pptObject">先看材料类型，<br>再选识别方式</h2>
+            <p class="lead pptObject" style="font-size:22px;margin-top:12px">1.能复制文字的 PDF 直接抽文本</p><div>2.图片、碑刻、录音再进入 OCR、VLM 或转写流程。</div><p class="pptObject"></p>
+          </div>
+          <div class="miniRules">
+            <div class="miniRule pptObject" style="line-height: 2.4;"><b style="font-size: 22px;">能复制</b><span style="font-size: 17px;">直接抽文本，省掉 OCR 错字。</span></div>
+            <div class="miniRule pptObject"><b style="font-size: 22px;">不能复制</b><span style="font-size: 17px;">先看清晰度，再决定 OCR 或 VLM。</span></div>
+            <div class="miniRule pptObject"><b style="font-size: 20px;">版面复杂</b><span style="font-size: 15px;">先切块，否则会串栏、漏图、乱序。</span></div>
+            <div class="miniRule pptObject"><b style="font-size: 20px;">字迹不稳</b><span style="font-size: 15px;">输出候选和疑难字，然后交叉验证。</span></div>
+          </div>
+        </div>
+        <div class="glass pad pptObject">
+          <div class="decision">
+            <div class="row"><b>能复制文字</b><span>直接抽文本，保留页码和段落。</span><em>抽文本</em></div>
+            <div class="row"><b>只是图片</b><span>先 OCR 或 VLM，再检查漏字、串栏、方向问题。</span><em>识别</em></div>
+            <div class="row"><b>图文混排</b><span>旧报纸、契约、族谱，先分区再识别。</span><em>分区</em></div>
+            <div class="row"><b>手写/碑刻</b><span>特写、多lei模型候选、疑难字标记。</span><em>复核</em></div>
+            <div class="row"><b>录音/视频</b><span>先转写，再加时间戳和人名地名复核。</span><em>转写</em></div>
+            <div class="row"><b>整本书</b><span>先切成章、节、段，再抽节点和关系。</span><em>切块</em></div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+  </section>
+
+  <section class="slide" data-source="整体工作流：从原始史料到结构化数据">
+    <div class="softBg"></div>
+    <div class="content"><div class="frame">
+      <div class="head center"><div class="kicker pptObject">workflow</div><h2 class="pptObject">一份史料可以拆成五步处理</h2></div>
+      <div class="mainGrid two">
+        <div class="glass padLg workflow pptObject">
+          <div class="stepLine pptObject"><div class="stepNo">1</div><div><b>判型</b><span>文字、扫描、照片、录音、整本书。</span></div></div>
+          <div class="stepLine pptObject"><div class="stepNo">2</div><div><b>识读</b><span>能抽文字就抽文字，不能就 OCR / VLM。</span></div></div>
+          <div class="stepLine pptObject"><div class="stepNo">3</div><div><b>圈证据</b><span>字段必须能回到某个原图区域。</span></div></div>
+          <div class="stepLine pptObject"><div class="stepNo">4</div><div><b>入表</b><span>固定字段、统一格式、保留不确定项。</span></div></div>
+          <div class="stepLine pptObject"><div class="stepNo">5</div><div><b>复核</b><span>机器初稿，交叉核稿，人工定稿。</span></div></div>
+        </div>
+        <div class="glass padLg fillPanel pptObject">
+          <div>
+            <h2 style="font-size:48px" class="pptObject">先得到可检查的结果，<br>再进入分析</h2>
+            <p class="lead pptObject" style="font-size:22px;margin-top:12px">先把原始材料变成可核对的字段、证据和备注。</p>
+          </div>
+          <div class="miniRules">
+            <div class="miniRule pptObject"><b style="font-size: 26px;">原图</b><span style="font-size: 21px;">保留，不裁掉上下文。</span></div>
+            <div class="miniRule pptObject"><b style="font-size: 24px;">转写</b><span style="font-size: 19px;">疑难字、断句、方向都标出来。</span></div>
+            <div class="miniRule pptObject"><b style="font-size: 26px;">结构化表</b><span style="font-size: 21px;">每列都要有固定含义。</span></div>
+            <div class="miniRule pptObject"><b style="font-size: 26px;">证据</b><span style="font-size: 21px;">每格都能回到原文位置。</span></div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+  </section>
+
+  <section class="slide" data-source="新素材包总览：侨批、族谱、旧报纸、墓碑、整本书、口述史">
+    <div class="softBg"></div>
+    <div class="content"><div class="frame">
+      <div class="head center"><div class="kicker pptObject">demo materials</div><h2 class="pptObject">后面用六类材料做演示</h2></div>
+      <div class="thumbGrid">
+        <div class="thumbCard pptObject"><img src="assets/img_002.jpg" alt="侨批"><span class="badge">01</span><div class="thumbText"><b>侨批</b><span>图上找金额、人名、地址，再转成字段。</span></div></div>
+        <div class="thumbCard pptObject"><img src="assets/img_003.png" alt="族谱"><span class="badge">02</span><div class="thumbText"><b>族谱</b><span>把世系页转成人物节点和关系边。</span></div></div>
+        <div class="thumbCard pptObject"><img src="assets/img_004.png" alt="旧报纸"><span class="badge">03</span><div class="thumbText"><b>旧报纸</b><span>复杂版面先分区，再分栏 OCR。</span></div></div>
+        <div class="thumbCard pptObject"><img src="assets/img_005.jpg" alt="墓碑"><span class="badge">04</span><div class="thumbText"><b>墓碑</b><span>方向校正、碑文特写、字段化识别。</span></div></div>
+        <div class="thumbCard pptObject"><img src="assets/img_006.jpg" alt="整本书示意"><span class="badge">05</span><div class="thumbText"><b>整本书</b><span>从章节文本转成事件和关系网络。</span></div></div>
+        <div class="thumbCard pptObject"><img src="assets/img_007.jpg" alt="口述史背景"><span class="badge">06</span><div class="thumbText"><b>口述史</b><span>音频转写、时间戳、人名地名复核。</span></div></div>
+      </div>
+    </div></div>
+  </section>
+
+  <section class="slide" data-source="素材：01_侨批信札/课堂演示_侨批信件正文_金额分配区域.jpg">
+    <div class="softBg"></div>
+    <div class="content"><div class="frame">
+      <div class="head row"><div><div class="kicker pptObject">case 1 · 侨批</div><h2 class="pptObject">先抓最关键的信息：金额</h2></div><p class="sub pptObject" style="max-width:420px">重点是把金额、人名、地址、用途这些信息提取成可复核字段。</p></div>
+      <div class="caseGrid">
+        <div class="pptPlaceholder" data-for="ppt-f80y8sb8vs" style="width: 773.266px; height: 699.547px; grid-area: auto; flex: 0 0 773.266px;"></div><div class="imagePanel pptObject" data-placeholder="ppt-f80y8sb8vs" data-floating="1" style="position: absolute; left: -2px; top: 102.453px; width: 773.266px; height: 699.547px; margin: 0px; z-index: 60;"><img src="assets/img_002.jpg" alt="侨批正文金额区域"><button class="pin pptObject" data-field="q-money" style="left:54%;top:46%">1</button><button class="pin blue pptObject active" data-field="q-person" style="left:34%;top:28%">2</button><button class="pin gold pptObject" data-field="q-use" style="left:45%;top:66%">3</button></div>
+        <div class="sidePanel">
+          <div class="pptPlaceholder" data-for="ppt-p2evxhmvit9" style="width: 634.156px; height: 80px; grid-area: auto; flex: 0 0 634.156px;"></div><div class="glass sideIntro pptObject" data-placeholder="ppt-p2evxhmvit9" data-floating="1" style="position: absolute; left: 795.438px; top: 124.453px; width: 625.141px; height: 53px; margin: 0px; z-index: 60;"></div>
+          <div class="fieldList">
+            <div class="pptPlaceholder" data-for="ppt-d3v7vw4knpe" style="width: 632.156px; height: 82.7812px; grid-area: auto; flex: 0 0 632.156px;"></div><div class="field pptObject" data-field="q-money" data-placeholder="ppt-d3v7vw4knpe" data-floating="1" style="position: absolute; left: 798.438px; top: 204.453px; width: 637.156px; height: 69.7812px; margin: 0px; z-index: 60;"><div class="mark">1</div><div><b>金额：一元银纸（第十列））</b><span>证据：正文金额区域。可以先入表，再回看上下文。</span></div></div>
+            <div class="pptPlaceholder" data-for="ppt-tezsjlrk7z" style="width: 632.156px; height: 104.734px; grid-area: auto; flex: 0 0 632.156px;"></div><div class="field pptObject active" data-field="q-person" data-placeholder="ppt-tezsjlrk7z" data-floating="1" style="position: absolute; left: 798.438px; top: 298.375px; width: 639.156px; height: 71.7344px; margin: 0px; z-index: 60;"><div class="mark">2</div><div><b>人物/称谓：<br>收信人：林氏；中间人：耀辉；提及亲属：母亲；寄信人：未署名，"我"</b><span></span></div></div>
+            <div class="pptPlaceholder" data-for="ppt-ppw1ugqo3tf" style="width: 632.156px; height: 79.1875px; grid-area: auto; flex: 0 0 632.156px;"></div><div class="field pptObject" data-field="q-use" data-placeholder="ppt-ppw1ugqo3tf" data-floating="1" style="position: absolute; left: 798.438px; top: 386.188px; width: 630.156px; height: 119.188px; margin: 0px; z-index: 60;"><div class="mark">3</div><div><b>用途/分配：<br><font color="rgba(0, 0, 0, 0.9)" face="-apple-system, BlinkMacSystemFont, Segoe UI, system-ui, Roboto, Noto Sans, Ubuntu, Cantarell, Helvetica Neue, sans-serif, Arial, PingFang SC, Source Han Sans SC, Microsoft YaHei UI, Microsoft YaHei, Noto Sans CJK SC"><span style="font-size: 14px; font-weight: 400; letter-spacing: 0.5px; white-space-collapse: preserve;">1. 询问去年四次汇银是否收到；2. 询问沦陷前寄往香港的两张汇票是否收到；3. 如钱款尚存，要求尽快处理并寄回；4. 告知母亲无粮，生活困难；5. 要求回信时顺带寄"一元银纸"过来；6. 催促尽快回信。</span></font></b><span></span></div></div>
+            <div class="pptPlaceholder" data-for="ppt-3r6ild4mskp" style="width: 656.734px; height: 262.969px; grid-area: auto; flex: 0 0 656.734px;"></div><div class="tableWrap pptObject" data-placeholder="ppt-3r6ild4mskp" data-floating="1" style="position: absolute; left: 792.266px; top: 530.031px; width: 656.734px; height: 262.969px; margin: 0px; z-index: 60;"><table><thead><tr><th>字段</th><th>结果</th><th>用途</th></tr></thead><tbody><tr><td>金额</td><td>一元银纸</td><td><span class="tag ok">量化</span></td></tr><tr><td>证据</td><td>正文金额区域</td><td><span class="tag">证据</span></td></tr><tr><td>人名</td><td>林氏；耀辉；母亲；我</td><td><span class="tag warn">建立人物关系</span></td></tr><tr><td>用途</td><td>依据全文抽取</td><td><span class="tag warn">判断</span></td></tr></tbody></table></div>
+          </div>
+        </div>
+      </div>
+    <h3 class="pptObject" data-floating="1" style="position: absolute; left: 812.438px; top: 133.438px; width: 591.141px; height: 35px; margin: 0px; z-index: 80;">结构化提取</h3></div></div>
+  </section>
+
+  <section class="slide" data-source="素材：侨批分区图、信封正面、信封背面">
+    <div class="softBg"></div>
+    <div class="content"><div class="frame">
+      <div class="head row"><div><div class="kicker pptObject">case 1 · 侨批入表</div><h2 class="pptObject">最后效果是一份可复核的结构化数据</h2></div><p class="sub pptObject" style="max-width:420px">同一封信可以拆成正文、信封、印章、地址几个区域。</p></div>
+      <div class="tableSlide">
+        <div class="strip">
+          <figure class="pptObject"><img src="assets/img_002.jpg" alt="正文"><figcaption>正文：金额与用途</figcaption></figure>
+          <figure class="pptObject"><img src="assets/img_008.jpg" alt="信封正面"><figcaption>信封：收寄人地址</figcaption></figure>
+          <figure class="pptObject"><img src="assets/img_009.jpg" alt="印章"><figcaption>背面：印章与邮戳</figcaption></figure>
+        </div>
+        <div class="tableWrap scroll pptObject"><table><thead><tr><th>材料位置</th><th>字段</th><th>识别草稿</th><th>证据</th><th>复核</th></tr></thead><tbody>
+          <tr><td>信件正文</td><td>金额</td><td>一元银纸</td><td>金额分配区域</td><td><span class="tag ok">优先入表</span></td></tr>
+          <tr><td>信件正文</td><td>用途/分配</td><td>围绕金额上下文抽取</td><td>金额前后数行</td><td><span class="tag warn">人工读句</span></td></tr>
+          <tr><td>信件正文</td><td>亲属称谓</td><td>父、母、兄、嫂等候选</td><td>称谓出现行</td><td><span class="tag warn">结合上下文</span></td></tr>
+          <tr><td>信件正文</td><td>情绪表达</td><td>平安、急需、嘱托等</td><td>正文语句</td><td><span class="tag">可二次编码</span></td></tr>
+          <tr><td>信封正面</td><td>收寄人、地址</td><td>按地址块抽取</td><td>信封正面分区图</td><td><span class="tag">核对地名</span></td></tr>
+          <tr><td>信封背面</td><td>印章、邮戳</td><td>只作识别线索</td><td>印章区域</td><td><span class="tag warn">不直接定稿</span></td></tr>
+          <tr><td>整封信</td><td>材料编号</td><td>文件名 / 馆藏编号</td><td>原始文件</td><td><span class="tag gold">必须保留</span></td></tr>
+          <tr><td>整封信</td><td>转写版本</td><td>v1 / v2 / 人工定稿</td><td>处理记录</td><td><span class="tag gold">便于追溯</span></td></tr>
+        </tbody></table></div>
+      </div>
+    </div></div>
+  </section>
+
+  <section class="slide" data-source="素材：02_族谱家谱/课堂演示页_第4页_世系父子关系.png">
+    <div class="softBg"></div>
+    <div class="content"><div class="frame">
+      <div class="head row"><div><div class="kicker pptObject">case 2 · 族谱</div><h2 class="pptObject">族谱不只<span style="font-size: clamp(34px, 4.4vw, 62px); letter-spacing: -0.045em; text-wrap-mode: initial;">是</span><span style="font-size: clamp(34px, 4.4vw, 62px); letter-spacing: -0.045em; text-wrap-mode: initial;">认字，重点是拆关系</span><br></h2></div><p class="sub pptObject" style="max-width:420px">谱牒里的竖线、横线、旁注，本身就是结构信息。</p></div>
+      <div class="caseGrid">
+        <div class="imagePanel pptObject"><img src="assets/img_003.png" alt="族谱世系父子关系"><button class="pin pptObject" data-field="g-root" style="left:50%;top:15%">1</button><button class="pin blue pptObject active" data-field="g-line" style="left:44%;top:48%">2</button><button class="pin gold pptObject" data-field="g-note" style="left:70%;top:76%">3</button></div>
+        <div class="sidePanel"><div class="glass sideIntro pptObject"><h3 class="pptObject">抽取目标：人物 + 关系</h3><p class="sub pptObject">先把关系边一条一条落表。</p></div>
+          <div class="fieldList">
+            <div class="field pptObject" data-field="g-root"><div class="mark">1</div><div><b>节点：上一代人物</b><span>作为父节点，保留页码和图上位置。</span></div></div>
+            <div class="field pptObject active" data-field="g-line"><div class="mark">2</div><div><b>边：父子 / 兄弟分支</b><span>证据不只有文字，也包括谱牒中的竖线和横线。</span></div></div>
+            <div class="field pptObject" data-field="g-note"><div class="mark">3</div><div><b>附加字段：配偶、葬地、迁徙</b><span>旁注信息不能和主世系混在一起。</span></div></div>
+            <div class="compactCards"><div class="compactCard pptObject"><span class="ico">点</span><div><b>节点</b><span>每个人一条记录。</span></div></div><div class="compactCard pptObject"><span class="ico">边</span><div><b>关系</b><span>父子、配偶、过继、迁徙。</span></div></div><div class="compactCard pptObject"><span class="ico">证</span><div><b>证据</b><span>页码、区域、原文片段。</span></div></div></div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+  </section>
+
+  <section class="slide" data-source="族谱关系表：从谱页到可检索数据">
+    <div class="softBg"></div>
+    <div class="content"><div class="frame">
+      <div class="head row"><div><div class="kicker pptObject">case 2 · 关系图</div><h2 class="pptObject">族谱里面的关系网络</h2></div><p class="sub pptObject" style="max-width:420px">关系图是为了说明数据里的“关系边”怎么来的。</p></div>
+      <div class="diagramGrid">
+        <div class="diagram pptObject"><svg viewBox="0 0 560 420" role="img" aria-label="族谱关系图示意">
+          <line class="edge" x1="280" y1="82" x2="145" y2="198"></line><text class="svgLabel" x="205" y="132" transform="rotate(-37 205 132)">父子</text>
+          <line class="edge" x1="280" y1="82" x2="280" y2="198"></line><text class="svgLabel" x="302" y="148">父子</text>
+          <line class="edge" x1="280" y1="82" x2="415" y2="198"></line><text class="svgLabel" x="355" y="132" transform="rotate(37 355 132)">父子</text>
+          <line class="edge" x1="280" y1="215" x2="420" y2="215"></line><text class="svgLabel" x="350" y="194">配偶</text>
+          <line class="edge" x1="420" y1="250" x2="420" y2="342"></line><text class="svgLabel" x="447" y="300">葬地</text>
+          <circle class="node main" cx="280" cy="70" r="54"></circle><text class="svgText" x="280" y="62">上一代</text><text class="svgSmall" x="280" y="86">人物</text>
+          <circle class="node" cx="130" cy="218" r="44"></circle><text class="svgText" x="130" y="218">子一</text>
+          <circle class="node" cx="280" cy="218" r="44"></circle><text class="svgText" x="280" y="218">子二</text>
+          <circle class="node" cx="430" cy="218" r="44"></circle><text class="svgText" x="430" y="218">配偶</text>
+          <circle class="node gold" cx="420" cy="358" r="40"></circle><text class="svgText" x="420" y="358">葬地</text>
+        </svg></div>
+        <div class="tableWrap scroll pptObject"><table><thead><tr><th>人物A</th><th>关系</th><th>人物/地点B</th><th>证据位置</th><th>复核</th></tr></thead><tbody>
+          <tr><td>上一代人物</td><td>父子</td><td>子一</td><td>世系页主线</td><td><span class="tag">核排行</span></td></tr>
+          <tr><td>上一代人物</td><td>父子</td><td>子二</td><td>世系页分支</td><td><span class="tag">核同名</span></td></tr>
+          <tr><td>上一代人物</td><td>父子</td><td>子三</td><td>横向分支</td><td><span class="tag">核旁支</span></td></tr>
+          <tr><td>子二</td><td>配偶</td><td>配偶姓名</td><td>旁注区域</td><td><span class="tag warn">别混主线</span></td></tr>
+          <tr><td>子二</td><td>子女</td><td>下一代人物</td><td>下接谱页</td><td><span class="tag">跨页核对</span></td></tr>
+          <tr><td>配偶姓名</td><td>葬地</td><td>某地</td><td>配偶子女与葬地页</td><td><span class="tag warn">地名校对</span></td></tr>
+          <tr><td>某支系</td><td>迁徙</td><td>某地</td><td>旁注或序文</td><td><span class="tag gold">可做统计</span></td></tr>
+          <tr><td>同名人物</td><td>候选合并</td><td>另一页人物</td><td>字辈、排行、父名</td><td><span class="tag warn">人工定</span></td></tr>
+        </tbody></table></div>
+      </div>
+    </div></div>
+  </section>
+
+  <section class="slide" data-source="素材：03_旧报纸OCR/课堂演示页_第4版_广告嵌图复杂版面.png">
+    <div class="softBg"></div>
+    <div class="content"><div class="frame">
+      <div class="head row"><div><div class="kicker pptObject">case 3 · 旧报纸</div><h2 class="pptObject">旧报纸不能整页丢进去识别，先切版面</h2></div><p class="sub pptObject" style="max-width:420px">多栏、广告、嵌图会让 OCR 串行，先分区会稳很多。</p></div>
+      <div class="caseGrid">
+        <div class="imagePanel pptObject"><img src="assets/img_004.png" alt="旧报纸复杂版面"><button class="pin pptObject" data-field="p-title" style="left:50%;top:9%">1</button><button class="pin blue pptObject" data-field="p-col" style="left:25%;top:45%">2</button><button class="pin gold pptObject active" data-field="p-ad" style="left:70%;top:50%">3</button></div>
+        <div class="sidePanel"><div class="glass sideIntro pptObject"><h3 class="pptObject">复杂版面要先分区</h3><p class="sub pptObject">先让模型标出区域，不急着转全文。</p></div><div class="fieldList">
+          <div class="field pptObject" data-field="p-title"><div class="mark">1</div><div><b>版面块：报头、栏目、正文、广告</b><span>先确认页面结构，再决定 OCR 顺序。</span></div></div>
+          <div class="field pptObject" data-field="p-col"><div class="mark">2</div><div><b>分栏 OCR：按阅读顺序抽文字</b><span>旧报纸多栏排版，整页 OCR 很容易串行。</span></div></div>
+          <div class="field pptObject active" data-field="p-ad"><div class="mark">3</div><div><b>图文分开：广告单独记录</b><span>嵌图、广告、装饰字不宜混进正文。</span></div></div>
+          <div class="tableWrap pptObject"><table><thead><tr><th>输出字段</th><th>说明</th></tr></thead><tbody><tr><td>版次/日期</td><td>先定位报头</td></tr><tr><td>栏目区域</td><td>记录区域编号</td></tr><tr><td>阅读顺序</td><td>从上到下、从右到左</td></tr><tr><td>原文转写</td><td>保留疑难字</td></tr><tr><td>截图证据</td><td>回链原图</td></tr></tbody></table></div>
+        </div></div>
+      </div>
+    </div></div>
+  </section>
+
+  <section class="slide" data-source="素材：04_墓碑VLM/课堂演示_章芳林墓_碑文特写.jpg">
+    <div class="softBg"></div>
+    <div class="content"><div class="frame">
+      <div class="head row"><div><div class="kicker pptObject">case 4 · 墓碑</div><h2 class="pptObject">墓碑先校正方向，再进行碑文特写</h2></div><p class="sub pptObject" style="max-width:420px">整墓图看结构，碑文特写才适合认字。</p></div>
+      <div class="caseGrid">
+        <div class="imagePanel pptObject"><img src="assets/img_005.jpg" alt="章芳林墓碑文特写"><button class="pin active pptObject" data-field="t-name" style="left:49%;top:39%">1</button><button class="pin blue pptObject" data-field="t-origin" style="left:45%;top:57%">2</button><button class="pin gold pptObject" data-field="t-date" style="left:44%;top:75%">3</button></div>
+        <div class="sidePanel"><div class="glass sideIntro pptObject"><h3 class="pptObject">墓碑材料由于其特殊性，要结合多个方式进行判别</h3><p class="sub pptObject">vlm+交叉审查+多轮清洗+人工复核</p></div><div class="fieldList">
+          <div class="field active pptObject" data-field="t-name"><div class="mark">1</div><div><b>姓名/碑名</b><span>从主碑文区域抽取，保留原文写法。</span></div></div>
+          <div class="field pptObject" data-field="t-origin"><div class="mark">2</div><div><b>籍贯、身份、关系</b><span>逐行抽取，这类信息最有研究价值，也最容易错。</span></div></div>
+          <div class="field pptObject" data-field="t-date"><div class="mark">3</div><div><b>生卒/立碑时间</b><span>标准日期 + 原文日期并存。</span></div></div>
+          <div class="tableWrap pptObject"><table><thead><tr><th>字段</th><th>处理方式</th></tr></thead><tbody><tr><td>姓名</td><td>原文转写 + 规范名</td></tr><tr><td>时间</td><td>原文日期 + 标准日期</td></tr><tr><td>籍贯</td><td>原文地名 + 现代地名候选</td></tr><tr><td>关系</td><td>立碑人、亲属、社团</td></tr><tr><td>不确定字</td><td>用 □ 或候选字标出</td></tr></tbody></table></div>
+        </div></div>
+      </div>
+    </div></div>
+  </section>
+
+  <section class="slide" data-source="旧素材：墓碑1.jpg + 墓碑.xlsx 字段模板">
+    <div class="softBg"></div>
+    <div class="content"><div class="frame">
+      <div class="head row"><div><div class="kicker pptObject">case 4 · 双语墓碑</div><h2 class="pptObject">中英文并存，适合构造字段映射</h2></div><p class="sub pptObject" style="max-width:420px">中文姓、罗马字、英文名、中文碑文可以互相校验。</p></div>
+      <div class="caseGrid">
+        <div class="imagePanel pptObject"><img src="assets/img_010.jpg" alt="墓碑旧素材"><button class="pin pptObject" data-field="o-family" style="left:48%;top:18%">1</button><button class="pin blue pptObject" data-field="o-roman" style="left:48%;top:29%">2</button><button class="pin gold pptObject" data-field="o-name" style="left:48%;top:40%">3</button><button class="pin green pptObject active" data-field="o-epitaph" style="left:48%;top:65%">4</button></div>
+        <div class="sidePanel"><div class="pptPlaceholder" data-for="ppt-x6jsuznvee" style="width: 634.156px; height: 129.5px; grid-area: auto; flex: 0 0 634.156px;"></div><div class="glass sideIntro pptObject" data-placeholder="ppt-x6jsuznvee" data-floating="1" style="position: absolute; left: 802.438px; top: 111.453px; width: 634.156px; height: 70.5px; margin: 0px; z-index: 60;"><h3 class="pptObject">这类材料很适合体现“字段映射”</h3></div><div class="fieldList">
+          <div class="pptPlaceholder" data-for="ppt-avfj7sbody9" style="width: 632.156px; height: 74.5781px; grid-area: auto; flex: 0 0 632.156px;"></div><div class="field pptObject" data-field="o-family" data-placeholder="ppt-avfj7sbody9" data-floating="1" style="position: absolute; left: 802.438px; top: 203.953px; width: 632.156px; height: 74.5781px; margin: 0px; z-index: 60;"><div class="mark">1</div><div><b>中文姓氏</b><span>先识别大字，再核对英文姓。</span></div></div>
+          <div class="pptPlaceholder" data-for="ppt-ku35nwj757" style="width: 632.156px; height: 74.5781px; grid-area: auto; flex: 0 0 632.156px;"></div><div class="field pptObject" data-field="o-roman" data-placeholder="ppt-ku35nwj757" data-floating="1" style="position: absolute; left: 802.438px; top: 296.531px; width: 632.156px; height: 74.5781px; margin: 0px; z-index: 60;"><div class="mark">2</div><div><b>罗马字/英文姓</b><span>拼写可用于合并海外华人姓名。</span></div></div>
+          <div class="pptPlaceholder" data-for="ppt-s30v9lp1yod" style="width: 632.156px; height: 74.5781px; grid-area: auto; flex: 0 0 632.156px;"></div><div class="field pptObject" data-field="o-name" data-placeholder="ppt-s30v9lp1yod" data-floating="1" style="position: absolute; left: 802.438px; top: 394.109px; width: 632.156px; height: 74.5781px; margin: 0px; z-index: 60;"><div class="mark">3</div><div><b>英文姓名</b><span>人名字段单独保存，不和碑文混成一段。</span></div></div>
+          <div class="pptPlaceholder" data-for="ppt-jeu9vvtksh" style="width: 632.156px; height: 74.5781px; grid-area: auto; flex: 0 0 632.156px;"></div><div class="field pptObject active" data-field="o-epitaph" data-placeholder="ppt-jeu9vvtksh" data-floating="1" style="position: absolute; left: 802.438px; top: 490.688px; width: 632.156px; height: 74.5781px; margin: 0px; z-index: 60;"><div class="mark">4</div><div><b>中文碑文</b><span>逐行转写，疑难字标 □。</span></div></div>
+          <div class="pptPlaceholder" data-for="ppt-eapz0iikhdt" style="width: 632.156px; height: 169.734px; grid-area: auto; flex: 0 0 632.156px;"></div><div class="tableWrap pptObject" data-placeholder="ppt-eapz0iikhdt" data-floating="1" style="position: absolute; left: 797.438px; top: 596.266px; width: 635.156px; height: 189.734px; margin: 0px; z-index: 60;"><table><thead><tr><th>段</th><th>示例</th><th>复核</th></tr></thead><tbody><tr><td>中文姓</td><td>赵</td><td><span class="tag ok">较清晰</span></td></tr><tr><td>罗马字</td><td>CHIU</td><td><span class="tag">互证</span></td></tr><tr><td>合葬者名字（英文）</td><td>SOO MEE MEW CHIU</td><td><span class="tag">核拼写</span></td></tr><tr><td>日期</td><td>1934-10-12 至 2017-01-17</td><td><span class="tag warn">核图</span></td></tr><tr><td>中文碑文</td><td>逐行转写</td><td><span class="tag warn">人工核</span></td></tr></tbody></table></div>
+        </div></div>
+      </div>
+    </div></div>
+  </section>
+
+  <section class="slide" data-source="推文合集核心：整本书知识图谱、节点、边、事件">
+    <div class="softBg"></div>
+    <div class="content"><div class="frame">
+      <div class="head row"><div><div class="kicker pptObject">case 5 · 整本书</div><h2 class="pptObject">整书不能笼统处理，要拆成小单元</h2></div><p class="sub pptObject" style="max-width:420px">OCR 只是入口，真正有用的是把文本拆成可检索、可连接、可复核的节点和关系。</p></div>
+      <div class="diagramGrid">
+        <div class="diagram pptObject"><svg viewBox="0 0 560 420" role="img" aria-label="整本书知识图谱示意">
+          <line class="edge" x1="120" y1="210" x2="265" y2="210"></line><text class="svgLabel" x="192" y="188">切章编号</text>
+          <line class="edge" x1="340" y1="210" x2="440" y2="100"></line><text class="svgLabel" x="395" y="140" transform="rotate(-42 395 140)">人物</text>
+          <line class="edge" x1="340" y1="210" x2="470" y2="210"></line><text class="svgLabel" x="405" y="190">地点</text>
+          <line class="edge" x1="340" y1="210" x2="440" y2="320"></line><text class="svgLabel" x="395" y="280" transform="rotate(42 395 280)">事件</text>
+          <circle class="node gold" cx="105" cy="210" r="56"></circle><text class="svgText" x="105" y="200">一章</text><text class="svgSmall" x="105" y="224">原文</text>
+          <circle class="node main" cx="300" cy="210" r="66"></circle><text class="svgText" x="300" y="200">小卡片</text><text class="svgSmall" x="300" y="224">证据句</text>
+          <circle class="node" cx="465" cy="85" r="46"></circle><text class="svgText" x="465" y="85">人物</text>
+          <circle class="node" cx="500" cy="210" r="46"></circle><text class="svgText" x="500" y="210">地点</text>
+          <circle class="node" cx="465" cy="335" r="46"></circle><text class="svgText" x="465" y="335">事件</text>
+        </svg></div>
+        <div class="tableWrap scroll pptObject"><table><thead><tr><th>原文单位</th><th>节点</th><th>关系</th><th>证据</th></tr></thead><tbody>
+          <tr><td>卷/章/页</td><td>人物A</td><td>出现于</td><td>原文句子</td></tr>
+          <tr><td>某章某段</td><td>人物A、人物B</td><td>会见 / 冲突</td><td>原文句子</td></tr>
+          <tr><td>某章某段</td><td>地点C</td><td>事件发生地</td><td>原文句子</td></tr>
+          <tr><td>某章某段</td><td>事件D</td><td>发生于某时间</td><td>原文句子</td></tr>
+          <tr><td>某章某段</td><td>机构E</td><td>任命 / 隶属</td><td>原文句子</td></tr>
+          <tr><td>跨章节</td><td>人物A</td><td>同名合并候选</td><td>多处证据</td></tr>
+          <tr><td>全书</td><td>节点集合</td><td>统计 / 检索</td><td>回链原文</td></tr>
+          <tr><td>全书</td><td>关系边</td><td>网络可视化</td><td>抽样复核</td></tr>
+        </tbody></table></div>
+      </div>
+    </div></div>
+  </section>
+
+  <section class="slide" data-source="口述史案例：香港留声官方入口 + 录音转写流程">
+    <div class="slideBg"><img src="assets/img_007.jpg" alt="材料背景"><div class="shade"></div></div>
+    <div class="content"><div class="frame">
+      <div class="head"><div class="kicker pptObject">case 6 · 口述史</div><h2 class="pptObject">录音史料与文字材料一样：先转写，再提信息</h2></div>
+      <div class="mainGrid two">
+        <div class="glass padLg workflow pptObject">
+          <div class="stepLine pptObject"><div class="stepNo">1</div><div><b style="font-size: 24px;">转写</b><span style="font-size: 20px;">录音转文字，保留时间节点。</span></div></div>
+          <div class="stepLine pptObject"><div class="stepNo">2</div><div><b style="font-size: 24px;">分段</b><span style="font-size: 20px;">按话题、说话人、时间段切开。</span></div></div>
+          <div class="stepLine pptObject"><div class="stepNo">3</div><div><b style="font-size: 24px;">复核</b><span style="font-size: 20px;">人名、地名、方言、年份容易错。</span></div></div>
+          <div class="stepLine pptObject"><div class="stepNo">4</div><div><b style="font-size: 24px;">授权</b><span style="font-size: 20px;">口述史还要注意隐私和公开边界。</span></div></div>
+        </div>
+        <div class="tableWrap pptObject"><table><thead><tr><th>时间节点</th><th>转写</th><th>复核点</th></tr></thead><tbody><tr><td>00:00-00:18</td><td>自我介绍、地点、年代</td><td><span class="tag">人名地名</span></td></tr><tr><td>00:18-01:05</td><td>事件回忆</td><td><span class="tag warn">年份</span></td></tr><tr><td>01:05-02:10</td><td>家庭/迁徙经历</td><td><span class="tag warn">关系</span></td></tr><tr><td>02:10-03:00</td><td>职业、学校、社团经历</td><td><span class="tag">机构名</span></td></tr><tr><td>03:00-04:20</td><td>迁移路线、居住地变化</td><td><span class="tag warn">地名</span></td></tr><tr><td>04:20-05:10</td><td>对某事件的评价</td><td><span class="tag gold">语境</span></td></tr><tr><td>全段</td><td>摘要与主题词</td><td><span class="tag gold">授权</span></td></tr><tr><td>全段</td><td>敏感信息标记</td><td><span class="tag warn">隐私</span></td></tr></tbody></table></div>
+      </div>
+    </div></div>
+  </section>
+
+  <section class="slide" data-source="提示词写法：任务、字段、证据、格式、复核">
+    <div class="softBg"></div>
+    <div class="content"><div class="frame">
+      <div class="head row"><div><div class="kicker pptObject">prompt</div><h2 class="pptObject" style="font-size: 62px;">提示词要写清任务、字段和复核要求</h2></div><p class="sub pptObject" style="max-width: 420px; font-size: 15px;">&nbsp; &nbsp; &nbsp;不能只要求提取，要明确输出什么字段、如何标注不确定&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 项、如何回到原始材料。</p></div>
+      <div class="promptGrid">
+        <div class="pptPlaceholder" data-for="ppt-g2c2ndu2qcg" style="width: 615.75px; height: 700.047px; grid-area: auto; flex: 0 0 615.75px;"></div><div class="glass padLg stack pptObject" data-placeholder="ppt-g2c2ndu2qcg" data-floating="1" style="position: absolute; left: -1px; top: 116.953px; width: 621.75px; height: 652.047px; margin: 0px; z-index: 60;">
+          <div class="pptPlaceholder" data-for="ppt-o8cwgepktro" style="width: 534.781px; height: 71.1875px; grid-area: auto; flex: 0 0 534.781px;"></div><div class="compactCard pptObject" data-placeholder="ppt-o8cwgepktro" data-floating="1" style="position: absolute; left: 30px; top: 22.953px; width: 533.781px; height: 124.188px; margin: 0px; z-index: 60;"><span class="ico" style="font-size: 19px;">转</span><div><b style="font-size: 22px;">逐行转写</b><span style="font-size: 19px;">疑难字用 □，不确定内容写待复核。</span></div></div>
+          <div class="pptPlaceholder" data-for="ppt-y1kmjvh4kcp" style="width: 534.781px; height: 71.1875px; grid-area: auto; flex: 0 0 534.781px;"></div><div class="compactCard pptObject" data-placeholder="ppt-y1kmjvh4kcp" data-floating="1" style="position: absolute; left: 30px; top: 184.141px; width: 539.781px; height: 114.188px; margin: 0px; z-index: 60;"><span class="ico" style="font-size: 19px;">表</span><div><b style="font-size: 22px;">输出结构化表</b><span style="font-size: 19px;">字段包括人名、时间、地点、金额、关系、证据。</span></div></div>
+          <div class="pptPlaceholder" data-for="ppt-ufjvzcl5wns" style="width: 534.781px; height: 71.1875px; grid-area: auto; flex: 0 0 534.781px;"></div><div class="compactCard pptObject" data-placeholder="ppt-ufjvzcl5wns" data-floating="1" style="position: absolute; left: 30px; top: 328.328px; width: 532.781px; height: 113.188px; margin: 0px; z-index: 60;"><span class="ico" style="font-size: 19px;">证</span><div><b style="font-size: 22px;">附证据位置</b><span style="font-size: 19px;">每一条都能回到原图或原文。</span></div></div>
+          <div class="pptPlaceholder" data-for="ppt-c86y3xr6ds" style="width: 534.781px; height: 71.1875px; grid-area: auto; flex: 0 0 534.781px;"></div><div class="compactCard pptObject" data-placeholder="ppt-c86y3xr6ds" data-floating="1" style="position: absolute; left: 30px; top: 487.516px; width: 533.781px; height: 108.188px; margin: 0px; z-index: 60;"><span class="ico" style="font-size: 19px;">避</span><div><b style="font-size: 22px;">不要只问总结</b><span style="font-size: 19px;">只问总结，容易得到无法复核的长段落。</span></div></div>
+        </div>
+        <div class="pptPlaceholder" data-for="ppt-lvpsk0b231" style="width: 785.812px; height: 646.219px; grid-area: auto; flex: 0 0 785.812px;"></div><div class="promptBox pptObject" style="font-size: 13px; position: absolute; left: 643.781px; top: 120.953px; width: 785.812px; height: 646.219px; margin: 0px; z-index: 60;" data-placeholder="ppt-lvpsk0b231" data-floating="1">你是一名专业的史料整理与档案数字化助手，专精于手写文献、侨批、契约、账簿、票据等民间文书的结构化提取工作。
+<br><div>1.核心工作原则：<div><div>零想象原则：所有输出必须严格锚定于图片可见的原始文本，禁止补充背景知识、历史推断或常识性脑补。
+证据优先原则：每一个字段都必须标注可回溯的证据位置（列号、行号或区域描述），无证据支撑的字段必须留空或标记为"待复核"。
+最小干预原则：对疑难字仅做字形描述，不做语义猜测；对残损、模糊、缺字处用 □ 占位。
+任务流程：
+材料类型判定：根据文本格式（书信、契约、账簿、票据等）、用语特征、抬头落款等，给出材料类型名称及判定依据。
+证据区域标注：按阅读顺序（竖排从右至左/横排从左至右）逐列/逐行编号，给出每区域的可识别原文，标注疑难字位置。</div><div>
+2.字段结构化抽取：严格提取以下字段，不得增删：
+人名：区分寄信人、收信人、经手人、提及人；姓名与称谓分开记录。
+时间：包括发信/立契日期、提及的历史时点、相关事件时间；区分"明书日期"与"推断日期"，后者标记待复核。
+地点：地名、方位、机构名；区分"直接出现"与"隐含指代"。
+金额：货币单位、数量、次数、票据张数；数字与单位必须分离记录。
+关系：亲属关系、社会关系、商业关系；仅记录文本中明确出现的称谓，不做关系推演。
+原文证据：逐列完整摘录，保持原字原句，保留繁简、异体、通假。
+<br></div><div>3.疑难与不确定处理：
+字形可辨但语义不明者：照录原文，标注"语义待复核"。
+字形不可辨者：以 □ 替代，标注"字形待复核"。
+字段无法从图中直接得出者：填"待复核"，禁止根据上下文"合理推断"为确定结果。
+输出格式：同一内容必须输出两种格式：
+JSON：字段层级清晰，便于机器解析。
+结构化表（Markdown）：字段、内容、证据位置、复核状态四列，便于人工审阅。
+质量检查：输出前自检：是否每个字段都有证据位置？是否存在无依据的确定结论？是否遗漏了可见的疑难字？
+</div></div></div></div>
+      </div>
+    </div></div>
+  </section>
+
+  <section class="slide" data-source="风险边界：幻觉、版权、隐私、版本、人工复核">
+    <div class="softBg"></div>
+    <div class="content"><div class="frame">
+      <div class="head center"><div class="kicker pptObject">boundary</div><h2 class="pptObject">关键是形成能够复核的结构化表格</h2></div>
+      <div class="mainGrid two">
+        <div class="glass padLg fillPanel pptObject"><div><h2 style="font-size:52px" class="pptObject">AI 的结果要能复核，<br>不只是一段话。</h2><p class="lead pptObject" style="font-size:22px;margin-top:12px">每一条都要能追到原始材料。</p></div><div class="bottomBand"><div><b style="line-height: 2.4;">原图</b><span>永远保留，不覆盖。</span></div><div><b style="line-height: 2.4;">转写</b><span>标版本、标疑难。</span></div><div><b style="line-height: 2.4;">结构化表</b><span>每条回链证据。</span></div></div><div class="miniRules"><div class="miniRule pptObject"><b>不确定</b><span>写待复核，不要猜。</span></div><div class="miniRule pptObject"><b>批量化</b><span>先抽样验准，再全量跑。</span></div><div class="miniRule pptObject"><b>共享前</b><span>先处理版权和隐私。</span></div><div class="miniRule pptObject"><b>交付物</b><span>原图、转写、结构化表一起存。</span></div></div></div>
+        <div class="compactCards">
+          <div class="compactCard pptObject"><span class="ico">幻</span><div><b>幻觉</b><span>看不清就要写看不清。</span></div></div>
+          <div class="compactCard pptObject"><span class="ico">证</span><div><b>证据</b><span>字段要附原图位置、原文句子或时间点。</span></div></div>
+          <div class="compactCard pptObject"><span class="ico">权</span><div><b>版权</b><span>内部展示、公开发布、数据共享要分开处理。</span></div></div>
+          <div class="compactCard pptObject"><span class="ico">隐</span><div><b>隐私</b><span>口述史、家族材料、私人信件尤其要注意授权。</span></div></div>
+          <div class="compactCard pptObject"><span class="ico">版</span><div><b>版本</b><span>保留原图、转写稿、结构化表三套文件。</span></div></div>
+          <div class="compactCard pptObject"><span class="ico">人</span><div><b>人工</b><span>AI 做初稿，人做定稿。</span></div></div>
+        </div>
+      </div>
+    </div></div>
+  </section>
+
+  <section class="slide" data-source="结尾：实操建议">
+    <div class="slideBg"><img src="assets/img_006.jpg" alt="墓碑原图"><div class="shade"></div></div>
+    <div class="content"><div class="frame">
+      <div></div>
+      <div class="heroFrame">
+        <div class="heroText"><div class="pptPlaceholder" data-for="ppt-5xlhr9dzq3l" style="width: 850px; height: 66.9531px; grid-area: auto; flex: 0 0 850px;"></div><h2 class="pptObject" data-placeholder="ppt-5xlhr9dzq3l" data-floating="1" style="position: absolute; left: 4px; top: 363.25px; width: 850px; height: 66.9531px; margin: 0px; z-index: 60;">处理的核心</h2><div class="pptPlaceholder" data-for="ppt-hoxtxk5n01b" style="width: 850px; height: 40.5px; grid-area: auto; flex: 0 0 850px;"></div><p class="lead pptObject" data-placeholder="ppt-hoxtxk5n01b" data-floating="1" style="position: absolute; left: 4px; top: 476.203px; width: 1388px; height: 50px; margin: 0px; z-index: 60;">利用AI处理史料，常见的用法是把史料变成结构化、可复核的数据，从而协助人在其中找出支持/反对现有学界观点的可论证点</p></div>
+        <div class="pptPlaceholder" data-for="ppt-sgiea2zoize" style="width: 1396.59px; height: 80.2969px; grid-area: auto; flex: 0 0 1396.59px;"></div><div class="chips pptObject" data-placeholder="ppt-sgiea2zoize" data-floating="1" style="position: absolute; left: 0px; top: 591.703px; width: 1396.59px; height: 80.2969px; margin: 0px; z-index: 60;"><div class="chip pptObject"><span class="ico">看</span><div><b>看图</b><span>先找到证据点。</span></div></div><div class="chip pptObject"><span class="ico">提</span><div><b>提字段</b><span>统一人名、时间、地点、金额、关系。</span></div></div><div class="chip pptObject"><span class="ico">核</span><div><b>回原文</b><span>每条数据都能追到原图或原文。</span></div></div></div>
+        <div class="pptPlaceholder" data-for="ppt-yuda73a92q8" style="width: 1396.59px; height: 21px; grid-area: auto; flex: 0 0 1396.59px;"></div><p class="pptObject" data-placeholder="ppt-yuda73a92q8" data-floating="1" style="position: absolute; left: 3px; top: 727px; width: 1396.59px; height: 21px; margin: 0px; z-index: 60;"><a class="pill" href="assets/doc_001.md" target="_blank">打开提示词合集</a> <a class="pill" href="assets/doc_002.md" target="_blank">打开材料清单</a></p>
+      </div>
+    </div></div>
+  </section>
+
+  
+  <button class="arrowBtn left" onclick="prev()">‹</button><button class="arrowBtn right" onclick="next()">›</button>
+  <div class="dots" id="dots"><button class="dot active" aria-label="go to slide 1"></button><button class="dot" aria-label="go to slide 2"></button><button class="dot" aria-label="go to slide 3"></button><button class="dot" aria-label="go to slide 4"></button><button class="dot" aria-label="go to slide 5"></button><button class="dot" aria-label="go to slide 6"></button><button class="dot" aria-label="go to slide 7"></button><button class="dot" aria-label="go to slide 8"></button><button class="dot" aria-label="go to slide 9"></button><button class="dot" aria-label="go to slide 10"></button><button class="dot" aria-label="go to slide 11"></button><button class="dot" aria-label="go to slide 12"></button><button class="dot" aria-label="go to slide 13"></button><button class="dot" aria-label="go to slide 14"></button><button class="dot" aria-label="go to slide 15"></button><button class="dot" aria-label="go to slide 16"></button><button class="dot" aria-label="go to slide 17"></button></div><div class="progress" id="progress" style="width: 5.88235%;"></div><div class="source" id="source"></div><div class="pageNo" id="pageNo">1 / 17</div>
+</div>
+<script>
+  const STORAGE_KEY='historyAiDeckEdits_ppt_v4';
+  const saved=null;
+  if(saved){try{document.querySelector('.deck').innerHTML=saved;}catch(e){console.warn('restore failed',e)}}
+  // 保留用户已调整的位置，不再强制复原第一页底部三框
+  // repairFirstSlideChips();
+  let slides=[...document.querySelectorAll('.slide')];
+  let dots=document.getElementById('dots');
+  let progress=document.getElementById('progress');
+  let pageNo=document.getElementById('pageNo');
+  let source=document.getElementById('source');
+  const editableSelector='.slide h1,.slide h2,.slide h3,.slide p,.slide b,.slide span,.slide td,.slide th,.slide figcaption,.slide mark,.slide em,.slide .quote,.slide .term,.slide .use,.slide .promptBox,.slide .desc span,.slide .route span,.slide .route b,.slide .thumbText span,.slide .thumbText b,.slide .field span,.slide .field b,.slide .miniRule span,.slide .miniRule b,.slide .stepLine span,.slide .stepLine b,.slide .chip span,.slide .chip b,.slide .compactCard span,.slide .compactCard b';
+  const movableSelector='.slide h1,.slide h2,.slide h3,.slide p,.slide .kicker,.slide .quote,.slide .term,.slide .use,.slide .route,.slide .chips,.slide .flowRow,.slide .glass,.slide .imagePanel,.slide .tableWrap,.slide .thumbCard,.slide .diagram,.slide .promptBox,.slide .compactCard,.slide .miniRule,.slide .stepLine,.slide .field,.slide .strip figure,.slide .pin,.slide .pptGroup';
+  let current=0;
+  let layoutMode=false;
+  let selectedMove=null;
+  const selectedMoves=new Set();
+  let dragState=null;
+  let resizeState=null;
+  const undoStack=[];
+  const redoStack=[];
+  const initialSlideHTML=slides.map(s=>s.innerHTML);
+  if(dots) dots.innerHTML='';
+  ensureEditorControls();
+  initPptObjects();
+  setEditable(false);
+  document.body.classList.remove('editing','layouting');
+  slides.forEach((_,i)=>{const d=document.createElement('button');d.className='dot';d.setAttribute('aria-label','go to slide '+(i+1));d.onclick=()=>go(i);dots.appendChild(d);});
+  let dotEls=[...document.querySelectorAll('.dot')];
+  function go(i){if(i<0)i=slides.length-1;if(i>=slides.length)i=0;slides.forEach((s,idx)=>{s.classList.remove('active','prev');if(idx<i)s.classList.add('prev');});slides[i].classList.add('active');dotEls.forEach((d,idx)=>d.classList.toggle('active',idx===i));current=i;progress.style.width=((i+1)/slides.length*100)+'%';pageNo.textContent=(i+1)+' / '+slides.length;source.textContent=slides[i].dataset.source||'';deselectMovable();}
+  function next(){go(current+1)}function prev(){go(current-1)}function toggleFull(){if(!document.fullscreenElement){document.documentElement.requestFullscreen?.()}else{document.exitFullscreen?.()}}
+  function setEditable(on){document.querySelectorAll(editableSelector).forEach(el=>{el.contentEditable=on?'true':'false';});document.querySelectorAll('.moveHandle,.resizeHandle').forEach(el=>{el.contentEditable='false';});}
+  function ensureEditorControls(){
+    const hint=document.querySelector('.editHint');
+    if(hint) hint.textContent='文字编辑：单击文字直接改；对象编辑：拖左上角小把手移动，Shift 多选，Esc 退出。按 H 可隐藏/显示工具栏。';
+    initDockDrag();
+  }
+  function toggleChrome(force){
+    const next=typeof force==='boolean'?force:!document.body.classList.contains('uiHidden');
+    document.body.classList.toggle('uiHidden',next);
+  }
+  function initDockDrag(){
+    const dock=document.getElementById('editorDock');
+    const handle=document.getElementById('dockHandle');
+    if(!dock||!handle||handle.dataset.bound==='1') return;
+    handle.dataset.bound='1';
+    let st=null;
+    handle.addEventListener('pointerdown',e=>{
+      const r=dock.getBoundingClientRect();
+      st={x:e.clientX,y:e.clientY,left:r.left,top:r.top};
+      e.preventDefault();
+    });
+    window.addEventListener('pointermove',e=>{
+      if(!st) return;
+      const left=Math.max(8,Math.min(window.innerWidth-80,st.left+e.clientX-st.x));
+      const top=Math.max(8,Math.min(window.innerHeight-44,st.top+e.clientY-st.y));
+      dock.style.left=left+'px';
+      dock.style.top=top+'px';
+      dock.style.right='auto';
+    });
+    window.addEventListener('pointerup',()=>{st=null;});
+  }
+  function repairFirstSlideChips(){
+    const first=document.querySelector('.slide');
+    if(!first) return;
+    const chips=first.querySelector('.chips');
+    if(!chips) return;
+    chips.classList.remove('movableSelected','pptGroup');
+    chips.removeAttribute('contenteditable');
+    chips.dataset.floating='';
+    chips.style.position='';
+    chips.style.left='';
+    chips.style.top='';
+    chips.style.width='';
+    chips.style.height='';
+    chips.style.margin='';
+    chips.style.zIndex='';
+    chips.innerHTML='<div class="chip"><span class="ico">1</span><div><b>看清楚</b><span>把图片、扫描件、录音转成可处理的信息。</span></div></div><div class="chip"><span class="ico">2</span><div><b>提字段</b><span>提取人名、时间、地点、金额、关系、事件。</span></div></div><div class="chip"><span class="ico">3</span><div><b>可复核</b><span>每条结果都能回到原图、原文或时间戳。</span></div></div>';
+  }
+  function initPptObjects(){
+    document.querySelectorAll(movableSelector).forEach(el=>{
+      if(!el.classList.contains('pptObject')) el.classList.add('pptObject');
+      if(!el.querySelector(':scope > .moveHandle')){
+        const h=document.createElement('span');h.className='moveHandle';h.title='拖动移动';h.contentEditable='false';el.appendChild(h);
+      }
+    });
+  }
+  function cleanDeckHTML(){
+    const clone=document.querySelector('.deck').cloneNode(true);
+    clone.querySelectorAll('.moveHandle,.resizeHandle,.guideLine').forEach(n=>n.remove());
+    clone.querySelectorAll('.movableSelected').forEach(n=>n.classList.remove('movableSelected'));
+    clone.querySelectorAll('[contenteditable]').forEach(n=>n.removeAttribute('contenteditable'));
+    return clone.innerHTML;
+  }
+  function persistEdits(){
+    localStorage.setItem(STORAGE_KEY,cleanDeckHTML());
+    const btn=document.getElementById('saveBtn');
+    if(btn){const old=btn.textContent;btn.textContent='已保存';setTimeout(()=>btn.textContent=old,700);}
+  }
+  function saveUndo(){undoStack.push(cleanDeckHTML()); redoStack.length=0; if(undoStack.length>80) undoStack.shift();}
+  function deselectMovable(){
+    selectedMoves.forEach(el=>el.classList.remove('movableSelected'));
+    selectedMoves.clear();
+    selectedMove=null;
+    document.querySelectorAll('.resizeHandle,.guideLine').forEach(n=>n.remove());
+  }
+  function toggleMove(){
+    if(!document.body.classList.contains('editing')) toggleEdit();
+    layoutMode=!layoutMode;
+    document.body.classList.toggle('layouting',layoutMode);
+    setEditable(document.body.classList.contains('editing'));
+    initPptObjects();
+    const btn=document.getElementById('moveBtn');
+    if(btn){btn.textContent=layoutMode?'退出对象':'对象编辑';btn.classList.toggle('on',layoutMode);}
+    if(!layoutMode) {deselectMovable(); persistEdits();}
+  }
+  function toggleEdit(){
+    const on=!document.body.classList.contains('editing');
+    document.body.classList.toggle('editing',on);
+    const editBtn=document.getElementById('editBtn');
+    if(editBtn){editBtn.textContent=on?'退出编辑':'文字编辑';editBtn.classList.toggle('on',on);}
+    if(!on){layoutMode=false;document.body.classList.remove('layouting');deselectMovable();const btn=document.getElementById('moveBtn');if(btn){btn.textContent='对象编辑';btn.classList.remove('on');}}
+    setEditable(on);
+    if(on){document.addEventListener('input',persistEdits,true);initPptObjects();}else{document.removeEventListener('input',persistEdits,true);persistEdits();}
+  }
+  function exitAllModes(){
+    if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    layoutMode=false;
+    document.body.classList.remove('editing','layouting');
+    setEditable(false);
+    deselectMovable();
+    const editBtn=document.getElementById('editBtn'); if(editBtn){editBtn.textContent='文字编辑';editBtn.classList.remove('on');}
+    const moveBtn=document.getElementById('moveBtn'); if(moveBtn){moveBtn.textContent='对象编辑';moveBtn.classList.remove('on');}
+    persistEdits();
+  }
+  function makeFloating(el){
+    if(el.dataset.floating==='1') return;
+    const frame=el.closest('.frame'); if(!frame) return;
+    const r=el.getBoundingClientRect(); const fr=frame.getBoundingClientRect();
+    const ph=document.createElement('div');
+    ph.className='pptPlaceholder';
+    ph.style.width=r.width+'px';
+    ph.style.height=r.height+'px';
+    ph.style.gridColumn=getComputedStyle(el).gridColumn;
+    ph.style.gridRow=getComputedStyle(el).gridRow;
+    ph.style.flex='0 0 '+r.width+'px';
+    ph.dataset.for='ppt-'+Math.random().toString(36).slice(2);
+    el.dataset.placeholder=ph.dataset.for;
+    el.parentNode.insertBefore(ph,el);
+    el.style.position='absolute';
+    el.style.left=(r.left-fr.left)+'px';
+    el.style.top=(r.top-fr.top)+'px';
+    el.style.width=r.width+'px';
+    el.style.height=r.height+'px';
+    el.style.margin='0';
+    el.style.zIndex='60';
+    el.dataset.floating='1';
+  }
+  function selectMovable(el, add=false){
+    if(!add && !selectedMoves.has(el)) deselectMovable();
+    if(add && selectedMoves.has(el)){
+      el.classList.remove('movableSelected');
+      selectedMoves.delete(el);
+      selectedMove=[...selectedMoves].at(-1)||null;
+      return;
+    }
+    selectedMoves.add(el);
+    selectedMove=el;
+    el.classList.add('movableSelected');
+    if(!el.querySelector(':scope > .resizeHandle') && !el.classList.contains('pin')){
+      const h=document.createElement('span');h.className='resizeHandle';h.title='拖动缩放';h.contentEditable='false';el.appendChild(h);
+    }
+  }
+  function deleteSelected(){
+    if(!layoutMode || !selectedMoves.size) return;
+    saveUndo();
+    [...selectedMoves].forEach(el=>{
+      if(el.dataset.placeholder) document.querySelector('[data-for="'+el.dataset.placeholder+'"]')?.remove();
+      el.remove();
+    });
+    deselectMovable();
+    persistEdits();
+  }
+  function groupSelected(){
+    if(!layoutMode || selectedMoves.size<2) return;
+    saveUndo();
+    const items=[...selectedMoves];
+    items.forEach(makeFloating);
+    const frame=items[0].closest('.frame');
+    const fr=frame.getBoundingClientRect();
+    const rects=items.map(el=>({el,r:el.getBoundingClientRect()}));
+    const left=Math.min(...rects.map(x=>x.r.left-fr.left));
+    const top=Math.min(...rects.map(x=>x.r.top-fr.top));
+    const right=Math.max(...rects.map(x=>x.r.right-fr.left));
+    const bottom=Math.max(...rects.map(x=>x.r.bottom-fr.top));
+    const group=document.createElement('div');
+    group.className='pptGroup pptObject';
+    group.dataset.floating='1';
+    group.style.left=left+'px'; group.style.top=top+'px';
+    group.style.width=(right-left)+'px'; group.style.height=(bottom-top)+'px';
+    group.style.zIndex='70';
+    frame.appendChild(group);
+    const h=document.createElement('span'); h.className='moveHandle'; h.title='拖动移动'; h.contentEditable='false'; group.appendChild(h);
+    items.forEach(el=>{
+      const l=parseFloat(el.style.left||0)-left;
+      const t=parseFloat(el.style.top||0)-top;
+      el.classList.remove('movableSelected');
+      el.querySelectorAll(':scope > .resizeHandle').forEach(n=>n.remove());
+      el.style.left=l+'px'; el.style.top=t+'px'; el.style.zIndex='';
+      group.appendChild(el);
+    });
+    deselectMovable();
+    selectedMoves.add(group); selectedMove=group; group.classList.add('movableSelected');
+    const rh=document.createElement('span'); rh.className='resizeHandle'; rh.title='拖动缩放'; rh.contentEditable='false'; group.appendChild(rh);
+    persistEdits();
+  }
+  function ungroupSelected(){
+    if(!layoutMode || !selectedMoves.size) return;
+    const groups=[...selectedMoves].filter(el=>el.classList.contains('pptGroup'));
+    if(!groups.length) return;
+    saveUndo();
+    groups.forEach(group=>{
+      const frame=group.closest('.frame');
+      const gl=parseFloat(group.style.left||0), gt=parseFloat(group.style.top||0);
+      [...group.children].forEach(child=>{
+        if(child.classList.contains('moveHandle')||child.classList.contains('resizeHandle')) return;
+        if(!child.classList.contains('pptObject')) return;
+        child.style.left=(gl+parseFloat(child.style.left||0))+'px';
+        child.style.top=(gt+parseFloat(child.style.top||0))+'px';
+        child.style.zIndex='60';
+        frame.appendChild(child);
+      });
+      group.remove();
+    });
+    deselectMovable();
+    persistEdits();
+  }
+  function cloneMovable(el){
+    const frame=el.closest('.frame'); if(!frame) return null;
+    const r=el.getBoundingClientRect(); const fr=frame.getBoundingClientRect();
+    const clone=el.cloneNode(true);
+    clone.querySelectorAll('.moveHandle,.resizeHandle,.guideLine,.pptPlaceholder').forEach(n=>n.remove());
+    clone.classList.remove('movableSelected');
+    clone.classList.add('pptObject','copyFlash');
+    clone.dataset.floating='1';
+    clone.removeAttribute('data-placeholder');
+    clone.style.position='absolute';
+    clone.style.left=(r.left-fr.left+18)+'px';
+    clone.style.top=(r.top-fr.top+18)+'px';
+    clone.style.width=r.width+'px';
+    clone.style.height=r.height+'px';
+    clone.style.margin='0';
+    clone.style.zIndex='80';
+    const h=document.createElement('span');h.className='moveHandle';h.title='拖动移动';h.contentEditable='false';clone.appendChild(h);
+    frame.appendChild(clone);
+    setTimeout(()=>clone.classList.remove('copyFlash'),650);
+    return clone;
+  }
+  function duplicateSelected(){
+    if(!layoutMode || !selectedMoves.size) return;
+    saveUndo();
+    const copies=[...selectedMoves].map(cloneMovable).filter(Boolean);
+    deselectMovable();
+    copies.forEach(c=>{selectedMoves.add(c);c.classList.add('movableSelected');selectedMove=c;});
+    persistEdits();
+  }
+  function copyForDrag(el){
+    const base=selectedMoves.has(el)?[...selectedMoves]:[el];
+    const copies=base.map(cloneMovable).filter(Boolean);
+    deselectMovable();
+    copies.forEach(c=>{selectedMoves.add(c);c.classList.add('movableSelected');selectedMove=c;});
+    return copies;
+  }
+  function startDrag(e,el){
+    saveUndo();
+    let items;
+    if(e.ctrlKey||e.metaKey){
+      items=copyForDrag(el);
+      el=items[0]||el;
+    }else{
+      if(!selectedMoves.has(el)) selectMovable(el,e.shiftKey);
+      items=[...selectedMoves];
+      items.forEach(makeFloating);
+    }
+    const frame=el.closest('.frame');
+    dragState={items,frame,startX:e.clientX,startY:e.clientY,positions:items.map(item=>({item,left:parseFloat(item.style.left||0),top:parseFloat(item.style.top||0)}))};
+    el.setPointerCapture?.(e.pointerId); e.preventDefault(); e.stopPropagation();
+  }
+  function startResize(e,el){
+    saveUndo(); makeFloating(el);selectMovable(el,false);
+    const r=el.getBoundingClientRect();
+    resizeState={el,startX:e.clientX,startY:e.clientY,width:r.width,height:r.height};
+    el.setPointerCapture?.(e.pointerId); e.preventDefault(); e.stopPropagation();
+  }
+  document.addEventListener('pointerdown',e=>{
+    if(!layoutMode) return;
+    const resize=e.target.closest('.resizeHandle');
+    if(resize){startResize(e,resize.parentElement);return;}
+    const handle=e.target.closest('.moveHandle');
+    if(handle){startDrag(e,handle.parentElement);return;}
+    const el=e.target.closest('.pptObject');
+    if(el && el.closest('.slide.active')) selectMovable(el,e.shiftKey);
+  },true);
+  document.addEventListener('pointermove',e=>{
+    if(dragState){const dx=e.clientX-dragState.startX;const dy=e.clientY-dragState.startY;dragState.positions.forEach(({item,left,top})=>{item.style.left=(left+dx)+'px';item.style.top=(top+dy)+'px';});}
+    if(resizeState){const {el,width,height,startX,startY}=resizeState;const minW=el.classList.contains('chips')?760:el.classList.contains('tableWrap')?420:el.classList.contains('imagePanel')?360:90;const minH=el.classList.contains('chips')?92:el.classList.contains('tableWrap')?180:el.classList.contains('imagePanel')?220:50;el.style.width=Math.max(minW,width+e.clientX-startX)+'px';el.style.height=Math.max(minH,height+e.clientY-startY)+'px';}
+  });
+  document.addEventListener('pointerup',()=>{if(dragState||resizeState){dragState=null;resizeState=null;persistEdits();}});
+  function alignSelected(type){
+    if(!selectedMoves.size) return;
+    saveUndo();
+    const items=[...selectedMoves];
+    items.forEach(makeFloating);
+    const frame=selectedMove.closest('.frame'); const fr=frame.getBoundingClientRect();
+    const rects=items.map(el=>({el,r:el.getBoundingClientRect()}));
+    const minLeft=Math.min(...rects.map(x=>x.r.left-fr.left));
+    const minTop=Math.min(...rects.map(x=>x.r.top-fr.top));
+    const targetCenter=items.length>1?Math.min(...rects.map(x=>x.r.left-fr.left+x.r.width/2)):fr.width/2;
+    rects.forEach(({el,r})=>{
+      if(type==='left') el.style.left=minLeft+'px';
+      if(type==='right') el.style.left=(fr.width-r.width)+'px';
+      if(type==='hcenter') el.style.left=(targetCenter-r.width/2)+'px';
+      if(type==='top') el.style.top=minTop+'px';
+      if(type==='bottom') el.style.top=(fr.height-r.height)+'px';
+      if(type==='vcenter') el.style.top=((fr.height-r.height)/2)+'px';
+    });
+    persistEdits();
+  }
+  function nudgeSelected(dx,dy){
+    if(!selectedMoves.size) return;
+    selectedMoves.forEach(el=>{makeFloating(el);const l=parseFloat(el.style.left||0); const t=parseFloat(el.style.top||0);el.style.left=(l+dx)+'px'; el.style.top=(t+dy)+'px';});
+    persistEdits();
+  }
+  function textEditTargets(){
+    const selector='h1,h2,h3,p,b,span,td,th,figcaption,mark,em,.quote,.term,.use,.promptBox';
+    const targets=[];
+    if(document.activeElement?.isContentEditable){
+      targets.push(document.activeElement);
+    }else if(selectedMoves.size){
+      selectedMoves.forEach(el=>{
+        if(el.matches?.(selector)) targets.push(el);
+        targets.push(...el.querySelectorAll(selector));
+      });
+    }else{
+      targets.push(...document.querySelectorAll('.slide.active '+selector.split(',').join(',.slide.active ')));
+    }
+    return [...new Set(targets)].filter(el=>!el.classList.contains('moveHandle')&&!el.classList.contains('resizeHandle'));
+  }
+  function adjustFontSize(delta){
+    const targets=textEditTargets();
+    if(!targets.length) return;
+    saveUndo();
+    targets.forEach(el=>{
+      const fs=parseFloat(getComputedStyle(el).fontSize)||16;
+      el.style.fontSize=Math.max(8,Math.min(140,fs+delta))+'px';
+    });
+    persistEdits();
+  }
+  function adjustLineHeight(delta){
+    const targets=[];
+    if(document.activeElement?.isContentEditable) targets.push(document.activeElement);
+    else if(selectedMoves.size) targets.push(...selectedMoves);
+    else targets.push(...document.querySelectorAll('.slide.active h1,.slide.active h2,.slide.active h3,.slide.active p,.slide.active span,.slide.active b,.slide.active td,.slide.active th'));
+    saveUndo();
+    targets.forEach(el=>{const cs=getComputedStyle(el);let lh=parseFloat(cs.lineHeight);const fs=parseFloat(cs.fontSize)||16;if(!Number.isFinite(lh)) lh=1.4*fs;let unitless=lh/fs;unitless=Math.max(.8,Math.min(2.4,unitless+delta));el.style.lineHeight=unitless.toFixed(2);});
+    persistEdits();
+  }
+  function undoLayout(){
+    const html=undoStack.pop(); if(!html) return;
+    redoStack.push(cleanDeckHTML());
+    document.querySelector('.deck').innerHTML=html;
+    initAfterRestore();
+    persistEdits();
+  }
+  function redoLayout(){
+    const html=redoStack.pop(); if(!html) return;
+    undoStack.push(cleanDeckHTML());
+    document.querySelector('.deck').innerHTML=html;
+    initAfterRestore();
+    persistEdits();
+  }
+  function resetCurrentSlideLayout(){
+    if(!confirm('只重置当前页的对象位置和文字到本次打开时的状态？')) return;
+    slides[current].innerHTML=initialSlideHTML[current];
+    initAfterRestore(); persistEdits();
+  }
+  function initAfterRestore(){
+    slides=[...document.querySelectorAll('.slide')];
+    dots=document.getElementById('dots');
+    progress=document.getElementById('progress');
+    pageNo=document.getElementById('pageNo');
+    source=document.getElementById('source');
+    if(dots){
+      dots.innerHTML='';
+      slides.forEach((_,i)=>{const d=document.createElement('button');d.className='dot';d.setAttribute('aria-label','go to slide '+(i+1));d.onclick=()=>go(i);dots.appendChild(d);});
+      dotEls=[...document.querySelectorAll('.dot')];
+    }
+    current=Math.min(current,Math.max(0,slides.length-1));
+    initPptObjects(); setEditable(document.body.classList.contains('editing')); deselectMovable();
+    document.querySelectorAll('[data-field]').forEach(bindFieldClick);
+    go(current);
+  }
+  function exportEdited(){
+    document.body.classList.remove('editing','layouting','uiHidden');
+    layoutMode=false;deselectMovable();setEditable(false);
+    const doc=document.documentElement.cloneNode(true);
+    doc.querySelectorAll('.editorDock,.editHint,.moveHandle,.resizeHandle,.guideLine,.movableSelected').forEach(n=>{
+      if(n.classList&&n.classList.contains('movableSelected')) n.classList.remove('movableSelected');
+      else n.remove();
+    });
+    doc.querySelectorAll('[contenteditable]').forEach(n=>n.removeAttribute('contenteditable'));
+    const html='<!doctype html>\n'+doc.outerHTML;
+    const blob=new Blob([html],{type:'text/html;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='AI提取史料_编辑版.html';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  }
+  function deleteCurrentSlide(){
+    const all=[...document.querySelectorAll('.slide')];
+    if(all.length<=1) return alert('至少保留一页');
+    if(!confirm('确定删除当前页？建议先导出 HTML 备份。')) return;
+    saveUndo();
+    all[current]?.remove();
+    persistEdits();
+    location.reload();
+  }
+  function clearLocalEdits(){if(confirm('清空浏览器里暂存的修改？已导出的 HTML 不受影响。')){localStorage.removeItem(STORAGE_KEY);localStorage.removeItem('historyAiDeckEdits');location.reload();}}
+  document.addEventListener('beforeinput',e=>{if(e.target?.isContentEditable){saveUndo();}},true);
+  document.addEventListener('keydown',e=>{
+    const editing=document.body.classList.contains('editing');
+    const inText=e.target?.isContentEditable;
+    if((e.ctrlKey||e.metaKey)&&(e.key==='z'||e.key==='Z')){undoLayout();e.preventDefault();return;}
+    if((e.ctrlKey||e.metaKey)&&(e.key==='y'||e.key==='Y')){redoLayout();e.preventDefault();return;}
+    if((e.ctrlKey||e.metaKey)&&e.key==='ArrowRight'){next();e.preventDefault();return;}
+    if((e.ctrlKey||e.metaKey)&&e.key==='ArrowLeft'){prev();e.preventDefault();return;}
+    if(e.key==='Escape'){exitAllModes();e.preventDefault();return;}
+    if(editing&&inText&&!(e.ctrlKey||e.metaKey)) return;
+    if(e.key==='h'||e.key==='H'){toggleChrome();e.preventDefault();return;}
+    if(e.key==='e'||e.key==='E'){toggleEdit();return;}
+    if(editing&&(e.key==='m'||e.key==='M')){toggleMove();return;}
+    if(layoutMode&&selectedMoves.size&&((e.ctrlKey||e.metaKey)&&(e.key==='c'||e.key==='C'))){duplicateSelected();e.preventDefault();return;}
+    if(layoutMode&&selectedMoves.size&&(e.key==='Backspace'||e.key==='Delete')){deleteSelected();e.preventDefault();return;}
+    if(layoutMode&&selectedMoves.size&&(e.key==='g'||e.key==='G')){groupSelected();e.preventDefault();return;}
+    if(layoutMode&&selectedMoves.size&&(e.key==='u'||e.key==='U')){ungroupSelected();e.preventDefault();return;}
+    if(editing&&e.altKey&&(e.key==='+'||e.key==='=')){adjustFontSize(2);e.preventDefault();return;}
+    if(editing&&e.altKey&&(e.key==='-'||e.key==='_')){adjustFontSize(-2);e.preventDefault();return;}
+    if(editing&&(e.key==='+'||e.key==='=')){adjustLineHeight(.08);e.preventDefault();return;}
+    if(editing&&(e.key==='-'||e.key==='_')){adjustLineHeight(-.08);e.preventDefault();return;}
+    if(layoutMode&&selectedMoves.size&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)){const n=e.shiftKey?10:2;if(e.key==='ArrowLeft')nudgeSelected(-n,0);if(e.key==='ArrowRight')nudgeSelected(n,0);if(e.key==='ArrowUp')nudgeSelected(0,-n);if(e.key==='ArrowDown')nudgeSelected(0,n);e.preventDefault();return}
+    if(e.key==='ArrowRight'||e.key===' '){next()} if(e.key==='ArrowLeft'){prev()} if(e.key==='f'||e.key==='F'){toggleFull()}
+  });
+  function bindFieldClick(el){el.addEventListener('click',()=>{if(layoutMode)return;const id=el.dataset.field;const slide=el.closest('.slide');slide.querySelectorAll('.pin,.field').forEach(x=>x.classList.remove('active'));slide.querySelectorAll('[data-field="'+id+'"]').forEach(x=>x.classList.add('active'));});}
+  document.querySelectorAll('[data-field]').forEach(bindFieldClick);
+  go(0);
+</script>
+
+
+</body></html>
